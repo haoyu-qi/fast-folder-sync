@@ -1,0 +1,24 @@
+FROM node:24-alpine AS console
+WORKDIR /src/web
+COPY web/package.json web/package-lock.json ./
+RUN npm ci
+COPY web/ ./
+RUN npm run build
+
+FROM golang:1.26-alpine AS server
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+COPY --from=console /src/frontend ./frontend
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/fast-folder-sync-service .
+
+FROM alpine:3
+RUN apk add --no-cache ca-certificates tzdata
+ENV TZ=Asia/Shanghai
+WORKDIR /app
+COPY --from=server /out/fast-folder-sync-service /app/fast-folder-sync-service
+RUN mkdir -p /app/config /app/storage
+EXPOSE 9000
+VOLUME ["/app/config", "/app/storage"]
+ENTRYPOINT ["/app/fast-folder-sync-service", "run"]

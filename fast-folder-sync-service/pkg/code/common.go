@@ -1,0 +1,139 @@
+package code
+
+var (
+	Failed                = NewError(0)
+	Success               = NewSuss(1)
+	SuccessCreate         = NewSuss(2)
+	SuccessUpdate         = NewSuss(3)
+	SuccessDelete         = NewSuss(4)
+	SuccessPasswordUpdate = NewSuss(5)
+	SuccessNoUpdate       = NewSuss(6)
+
+	ErrorServerInternal            = NewError(300, true)
+	ErrorDBQuery                   = NewError(301, true)
+	ErrorServerBusy                = NewError(302, true)
+	ErrorTooManyRequests           = NewError(303, true)
+	ErrorNotFoundAPI               = NewError(304, true)
+	ErrorInvalidParams             = NewError(305)
+	ErrorInvalidAuthToken          = NewError(306)
+	ErrorNotUserAuthToken          = NewError(307)
+	ErrorInvalidUserAuthToken      = NewError(308)
+	ErrorInvalidToken              = NewError(309)
+	ErrorTokenExpired              = NewError(310)
+	ErrorTokenGenerate             = NewError(311)
+	ErrorAuthTokenIPRestricted     = NewError(312)
+	ErrorAuthTokenUARestricted     = NewError(313)
+	ErrorAuthTokenClientRestricted = NewError(314)
+	ErrorAuthTokenScopeRestricted  = NewError(315)
+
+	// --- User Related (400-419) ---
+	ErrorUserRegister            = NewError(400)
+	ErrorUserLoginFailed         = NewError(401)
+	ErrorUserLoginPasswordFailed = NewError(402)
+	ErrorUserNotFound            = NewError(403)
+	ErrorUserAlreadyExists       = NewError(404)
+	ErrorUserEmailAlreadyExists  = NewError(405)
+	ErrorUserUsernameNotValid    = NewError(406)
+	ErrorPasswordNotValid        = NewError(407)
+	ErrorUserOldPasswordFailed   = NewError(408)
+	ErrorUserPasswordNotMatch    = NewError(409)
+	ErrorUserRegisterIsDisable   = NewError(410)
+	ErrorUserIsNotAdmin          = NewError(411)
+	ErrorUserLocalFSDisabled     = NewError(412)
+	ErrorUserUpdate              = NewError(413)
+	ErrorUserAdminBlock          = NewError(414)
+
+	// --- Vault Related (420-429) ---
+	ErrorVaultNotFound           = NewError(420)
+	ErrorVaultExist              = NewError(421)
+	ErrorInvalidStorageType      = NewError(422)
+	ErrorInvalidCloudStorageType = NewError(423)
+
+	// --- Note Related (430-444) ---
+	ErrorNoteNotFound             = NewError(430)
+	ErrorNoteExist                = NewError(431)
+	ErrorNoteGetFailed            = NewError(432)
+	ErrorNoteModifyOrCreateFailed = NewError(433)
+	ErrorNoteContentModifyFailed  = NewError(434)
+	ErrorNoteDeleteFailed         = NewError(435)
+	ErrorNoteListFailed           = NewError(436)
+	ErrorNoteRenameFailed         = NewError(437)
+	ErrorRenameNoteTargetExist    = NewError(438)
+	ErrorNoteSyncFailed           = NewError(439)
+	ErrorNoteUpdateCheckFailed    = NewError(440)
+	ErrorNoteConflict             = NewError(441)
+	ErrorNoMatchFound             = NewError(442)
+	ErrorInvalidRegex             = NewError(443)
+	ErrorInvalidPath              = NewError(444)
+
+	// --- Folder Related (445-454) ---
+	ErrorFolderNotFound             = NewError(445)
+	ErrorFolderExist                = NewError(446)
+	ErrorFolderGetFailed            = NewError(447)
+	ErrorFolderModifyOrCreateFailed = NewError(448)
+	ErrorFolderDeleteFailed         = NewError(449)
+	ErrorFolderListFailed           = NewError(450)
+	ErrorFolderRenameFailed         = NewError(451)
+
+	// --- File/Attachment Related (455-469) ---
+	ErrorFileNotFound              = NewError(455)
+	ErrorFileGetFailed             = NewError(456)
+	ErrorFileModifyOrCreateFailed  = NewError(457)
+	ErrorFileContentModifyFailed   = NewError(458)
+	ErrorFileDeleteFailed          = NewError(459)
+	ErrorFileListFailed            = NewError(460)
+	ErrorFileUploadFailed          = NewError(461)
+	ErrorFileUploadCheckFailed     = NewError(462)
+	ErrorFileUploadSessionNotFound = NewError(463)
+	ErrorFileSaveFailed            = NewError(464)
+	ErrorFileRenameFailed          = NewError(465)
+	ErrorFileReadFailed            = NewError(466)
+	ErrorFileExist                 = NewError(467)
+
+	// --- Setting Related (470-479) ---
+	ErrorSettingNotFound             = NewError(470)
+	ErrorSettingExist                = NewError(471)
+	ErrorSettingGetFailed            = NewError(472)
+	ErrorSettingModifyOrCreateFailed = NewError(473)
+	ErrorSettingContentModifyFailed  = NewError(474)
+	ErrorSettingDeleteFailed         = NewError(475)
+	ErrorSettingListFailed           = NewError(476)
+	ErrorSettingSyncFailed           = NewError(477)
+	ErrorSettingUpdateCheckFailed    = NewError(478)
+	ErrorConfigSaveFailed            = NewError(479)
+
+	// --- Share Related (480-489) ---
+	ErrorShareNotFound         = NewError(480)
+	ErrorShareExpired          = NewError(481)
+	ErrorShareRevoked          = NewError(482)
+	ErrorSharePasswordRequired = NewError(483)
+	ErrorSharePasswordInvalid  = NewError(484)
+
+	// --- Sync & History (490-499) ---
+	ErrorHistoryNotFound        = NewError(491)
+	ErrorHistoryRestoreFailed   = NewError(492)
+	ErrorBackupConfigNotFound   = NewError(493)
+	ErrorBackupTaskFailed       = NewError(494)
+	ErrorBackupTypeUnknown      = NewError(495)
+	ErrorBackupExecuteIDReq     = NewError(496)
+	ErrorBackupVaultRequired    = NewError(497)
+	ErrorBackupStorageIDInvalid = NewError(498)
+	ErrorBackupConfigDisabled   = NewError(499)
+
+	// --- Storage Related (500-509) ---
+	ErrorStorageNotFound       = NewError(500)
+	ErrorStorageTypeDisabled   = NewError(501)
+	ErrorStorageValidateFailed = NewError(502)
+
+	// --- Git Sync Related (510-519) ---
+	ErrorGitSyncNotFound       = NewError(510)
+	ErrorGitSyncTaskRunning    = NewError(511)
+	ErrorGitSyncValidateFailed = NewError(512)
+
+	// --- Cloudflare Related (520-529) ---
+	ErrorCloudflaredDownloadFailed = NewError(520)
+	ErrorCloudflaredBinaryNotFound = NewError(521)
+
+	// --- Sync Conflict Related (530-539) ---
+	ErrorSyncConflict = NewError(530)
+)

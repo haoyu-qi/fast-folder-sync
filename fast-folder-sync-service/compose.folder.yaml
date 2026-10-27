@@ -1,0 +1,19 @@
+services:
+  folder-sync:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.folder
+    image: fast-folder-sync-service:0.2.0
+    container_name: fast-folder-sync
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    environment:
+      TZ: Asia/Shanghai
+    volumes:
+      - folder-sync-config:/app/config
+      - folder-sync-storage:/app/storage
+
+volumes:
+  folder-sync-config:
+  folder-sync-storage:

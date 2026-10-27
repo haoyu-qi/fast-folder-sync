@@ -1,0 +1,30 @@
+{
+  "name": "fast-folder-sync",
+  "productName": "Fast Folder Sync",
+  "version": "0.2.0",
+  "description": "Standalone folder backup and synchronization client",
+  "author": "Fast Folder Sync contributors",
+  "license": "Apache-2.0",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test tests/*.test.cjs",
+    "check": "node --check main.cjs && node --check preload.cjs && node --check renderer.js && node --check lib/files.cjs && node --check lib/local-sync.cjs && node --check lib/fns-sync.cjs",
+    "pack": "electron-builder --dir",
+    "dist:win": "electron-builder --win portable",
+    "dist:mac": "electron-builder --mac dmg",
+    "dist:linux": "electron-builder --linux AppImage"
+  },
+  "dependencies": { "ws": "8.18.3" },
+  "devDependencies": { "electron": "45.0.0", "electron-builder": "26.18.0" },
+  "build": {
+    "appId": "org.fastfoldersync.desktop",
+    "asar": true,
+    "directories": { "output": "release" },
+    "files": ["main.cjs", "preload.cjs", "renderer.js", "index.html", "style.css", "icon.png", "icon.ico", "lib/**", "package.json", "LICENSE"],
+    "icon": "icon.png",
+    "win": { "target": "portable", "icon": "icon.ico", "signAndEditExecutable": false },
+    "mac": { "category": "public.app-category.utilities" },
+    "linux": { "category": "Utility" }
+  }
+}

@@ -1,0 +1,284 @@
+name: Build plugin
+
+# 触发条件配置
+on:
+  push:
+    # 针对 master 分支的普通提交也触发
+    branches:
+      - "master"
+    paths:
+      - "manifest.json"
+# 权限配置：允许脚本写入仓库内容并生成构建证明
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+env:
+  NAME: ${{ github.event.repository.name }}
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: github.actor == 'haierkeys'
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref }} # 明确 checkout 触发 workflow 的分支
+          # 获取所有历史记录，为了确保能获取到 git tags
+          fetch-depth: 0 # Required to fetch tags
+
+      - uses: pnpm/action-setup@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: ".node-version"
+
+      # 核心逻辑：检查版本号变更
+      - name: Check Version
+        id: check_version
+        run: |
+          # 如果是 master 分支触发
+          if [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
+            echo "Triggered by master branch. Checking for version bump..."
+
+            # 获取上一个 commit 的版本号
+            LAST_VERSION=$(git show HEAD~1:manifest.json | jq -r .version)
+
+            # 从 manifest.json 中读取当前版本号
+            CURRENT_VERSION=$(jq -r .version manifest.json)
+
+            echo "Last Version: $LAST_VERSION"
+            echo "Current Version: $CURRENT_VERSION"
+
+            # 对比版本号
+            if [ "$LAST_VERSION" = "$CURRENT_VERSION" ]; then
+               echo "Version has not changed. Skipping."
+               # 输出变量 should_release = false，后续步骤会通过 if 判断跳过
+               echo "should_release=false" >> $GITHUB_OUTPUT
+            else
+               # check if current > last
+               # 使用 sort -V 进行版本号大小比较
+               # 取较大值
+               HIGHER_VERSION=$(echo -e "$LAST_VERSION\n$CURRENT_VERSION" | sort -V | tail -n 1)
+               if [ "$HIGHER_VERSION" = "$CURRENT_VERSION" ]; then
+                   echo "New version detected!"
+                   # 确认需要发布
+                   echo "should_release=true" >> $GITHUB_OUTPUT
+                   # 设置发布的 tag 名称为当前版本号
+                   echo "release_tag=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+
+                   # Create tag locally so we can push it later (or just use Release API to tag)
+                   # Since we use create-release action using 'tag_name', it often expects the tag to exist or it creates it.
+                   # Let's rely on create-release to create the tag if we pass a tag name that doesn't exist?
+                   # Actually actions/create-release usually creates a release object which creates the git tag.
+               else
+                   echo "Current version $CURRENT_VERSION is lower than $LAST_VERSION. Skipping."
+                   echo "should_release=false" >> $GITHUB_OUTPUT
+               fi
+            fi
+          else
+            # 如果是 tag 触发 (手动打 tag 推送)
+            echo "Triggered by tag ${{ github.ref }}. Proceeding with release."
+            echo "should_release=true" >> $GITHUB_OUTPUT
+            echo "release_tag=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+      - name: Prepare Commit Message
+        id: prepare
+        if: steps.check_version.outputs.should_release == 'true'
+        run: |
+          # 获取提交文本信息
+          msg=$(git log -1 --pretty=%B)
+
+          # 设置 Python 进行翻译
+          pip install deep-translator > /dev/null 2>&1 || true
+
+          # 运行翻译脚本
+          export COMMIT_MSG="$msg"
+
+          echo "commit_msg<<EOF" >> $GITHUB_OUTPUT
+          if [ -f "scripts/translate_commit.py" ]; then
+              python3 scripts/translate_commit.py >> $GITHUB_OUTPUT
+          else
+              echo "未找到翻译脚本，使用原始消息"
+              echo "$msg" >> $GITHUB_OUTPUT
+          fi
+          echo "EOF" >> $GITHUB_OUTPUT
+      - name: Build
+        id: build
+        # 只有在 check_version 步骤输出 should_release 为 true 时才执行
+        if: steps.check_version.outputs.should_release == 'true'
+        env:
+          COMMIT_MSG: ${{ steps.prepare.outputs.commit_msg }}
+        run: |
+          pnpm install
+          pnpm run build
+          # 使用 fast-note-sync 作为文件夹名，移除 obsidian- 前缀
+          PKG_NAME="fast-note-sync"
+          mkdir ${PKG_NAME}
+          cp main.js manifest.json styles.css ${PKG_NAME}
+          zip -r ${PKG_NAME}-v${{ steps.check_version.outputs.release_tag }}.zip ${PKG_NAME}
+
+          # 生成 changelog.txt
+          # echo "$COMMIT_MSG" > changelog.txt
+
+          ls
+          # 设置输出变量 tag_name
+          echo "tag_name=${{ steps.check_version.outputs.release_tag }}" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        if: steps.check_version.outputs.should_release == 'true'
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.check_version.outputs.release_tag }}
+          name: ${{ steps.check_version.outputs.release_tag }}
+          draft: false
+          prerelease: false
+          generate_release_notes: false
+          body: ${{ steps.prepare.outputs.commit_msg }}
+          target_commitish: ${{ github.sha }} # 明确指定在当前分支的 commit 上创建 tag
+          overwrite_files: true
+          files: |
+            fast-note-sync-v${{ steps.check_version.outputs.release_tag }}.zip
+            main.js
+            manifest.json
+            styles.css
+            # changelog.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate Artifact Attestation
+        if: steps.check_version.outputs.should_release == 'true'
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            main.js
+            manifest.json
+            styles.css
+
+      - name: Push Tag to CNB
+        if: steps.check_version.outputs.should_release == 'true'
+        env:
+          CNB_TOKEN: ${{ secrets.CNB_TOKEN }}
+          CNB_REPO: haierkeys/obsidian-fast-note-sync
+          RELEASE_TAG: ${{ steps.check_version.outputs.release_tag }}
+        run: |
+          git tag "${RELEASE_TAG}" || true
+          git remote add cnb "https://cnb:${CNB_TOKEN}@cnb.cool/${CNB_REPO}.git"
+          git push cnb "${RELEASE_TAG}" --force
+
+      - name: Create CNB Release and Upload Assets
+        if: steps.check_version.outputs.should_release == 'true'
+        env:
+          CNB_TOKEN: ${{ secrets.CNB_TOKEN }}
+          CNB_REPO: haierkeys/obsidian-fast-note-sync
+          RELEASE_TAG: ${{ steps.check_version.outputs.release_tag }}
+          RELEASE_BODY: ${{ steps.prepare.outputs.commit_msg }}
+          ZIP_FILE: fast-note-sync-v${{ steps.check_version.outputs.release_tag }}.zip
+        run: |
+          set -e
+          echo "::group::Creating CNB Release: ${RELEASE_TAG}"
+          RELEASE_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            -H "Accept: application/vnd.cnb.api+json" \
+            -H "Authorization: Bearer ${CNB_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg tag "${RELEASE_TAG}" \
+              --arg name "${RELEASE_TAG}" \
+              --arg body "${RELEASE_BODY}" \
+              '{tag_name: $tag, name: $name, body: $body, prerelease: false, draft: false}')" \
+            "https://api.cnb.cool/${CNB_REPO}/-/releases")
+
+          HTTP_CODE=$(echo "$RELEASE_RESPONSE" | tail -1)
+          RESPONSE_BODY=$(echo "$RELEASE_RESPONSE" | sed '$d')
+
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            RELEASE_ID=$(echo "$RESPONSE_BODY" | jq -r '.id')
+            echo "CNB Release created successfully, ID: ${RELEASE_ID}"
+          else
+            echo "::warning::Failed to create CNB Release (HTTP ${HTTP_CODE}), attempting to fetch existing release..."
+            LIST_RESPONSE=$(curl -s \
+              -H "Accept: application/vnd.cnb.api+json" \
+              -H "Authorization: Bearer ${CNB_TOKEN}" \
+              "https://api.cnb.cool/${CNB_REPO}/-/releases")
+            RELEASE_ID=$(echo "$LIST_RESPONSE" | jq -r ".[] | select(.tag_name==\"${RELEASE_TAG}\") | .id")
+            if [ -z "$RELEASE_ID" ] || [ "$RELEASE_ID" = "null" ]; then
+              echo "::error::Cannot create or find CNB Release for tag ${RELEASE_TAG}"
+              exit 1
+            fi
+            echo "Found existing CNB Release, ID: ${RELEASE_ID}"
+          fi
+          echo "::endgroup::"
+
+          # 准备上传列表
+          FILES=("${ZIP_FILE}" "main.js" "manifest.json" "styles.css") # "changelog.txt"
+
+          for FILE_NAME in "${FILES[@]}"; do
+            (
+              echo "Uploading ${FILE_NAME}..."
+              FILE_PATH="./${FILE_NAME}"
+              if [ ! -f "$FILE_PATH" ]; then
+                echo "::warning::File not found: ${FILE_PATH}, trying alternative location..."
+                # 处理如果文件在子目录的情况，但 build 步骤是 cp 到当前目录了
+              fi
+
+              FILE_SIZE=$(stat -c%s "$FILE_PATH")
+
+              UPLOAD_RESPONSE=$(curl -s -X POST \
+                -H "Accept: application/vnd.cnb.api+json" \
+                -H "Authorization: Bearer ${CNB_TOKEN}" \
+                -H "Content-Type: application/json" \
+                -d "$(jq -n \
+                  --arg name "${FILE_NAME}" \
+                  --argjson size ${FILE_SIZE} \
+                  '{asset_name: $name, size: $size, overwrite: true}')" \
+                "https://api.cnb.cool/${CNB_REPO}/-/releases/${RELEASE_ID}/asset-upload-url")
+
+              UPLOAD_URL=$(echo "$UPLOAD_RESPONSE" | jq -r '.upload_url')
+              VERIFY_URL=$(echo "$UPLOAD_RESPONSE" | jq -r '.verify_url')
+
+              if [ -z "$UPLOAD_URL" ] || [ "$UPLOAD_URL" = "null" ]; then
+                echo "::error::Failed to get upload URL for ${FILE_NAME}"
+                echo "Response: ${UPLOAD_RESPONSE}"
+                exit 1
+              fi
+
+              CONTENT_TYPE="application/octet-stream"
+              if [[ "${FILE_NAME}" == *.zip ]]; then CONTENT_TYPE="application/zip"; fi
+              if [[ "${FILE_NAME}" == *.js ]]; then CONTENT_TYPE="application/javascript"; fi
+              if [[ "${FILE_NAME}" == *.json ]]; then CONTENT_TYPE="application/json"; fi
+              if [[ "${FILE_NAME}" == *.css ]]; then CONTENT_TYPE="text/css"; fi
+              if [[ "${FILE_NAME}" == *.txt ]]; then CONTENT_TYPE="text/plain"; fi
+
+              UPLOAD_RESULT=$(curl -s -w "\n%{http_code}" -X PUT \
+                -H "Content-Type: ${CONTENT_TYPE}" \
+                --data-binary @"$FILE_PATH" \
+                "$UPLOAD_URL")
+              UPLOAD_HTTP_CODE=$(echo "$UPLOAD_RESULT" | tail -1)
+
+              if [ "$UPLOAD_HTTP_CODE" -ne 200 ] && [ "$UPLOAD_HTTP_CODE" -ne 201 ]; then
+                echo "::error::Failed to upload ${FILE_NAME} (HTTP ${UPLOAD_HTTP_CODE})"
+                exit 1
+              fi
+
+              CONFIRM_RESULT=$(curl -s -w "\n%{http_code}" -X POST \
+                -H "Accept: application/vnd.cnb.api+json" \
+                -H "Authorization: Bearer ${CNB_TOKEN}" \
+                "${VERIFY_URL}")
+              CONFIRM_HTTP_CODE=$(echo "$CONFIRM_RESULT" | tail -1)
+
+              if [ "$CONFIRM_HTTP_CODE" -ne 200 ] && [ "$CONFIRM_HTTP_CODE" -ne 201 ]; then
+                echo "::error::Failed to confirm upload for ${FILE_NAME} (HTTP ${CONFIRM_HTTP_CODE})"
+                exit 1
+              fi
+
+              echo "✅ ${FILE_NAME} uploaded successfully"
+            ) &
+          done
+          wait
+          echo "🎉 All assets uploaded to CNB Release!"
+
+

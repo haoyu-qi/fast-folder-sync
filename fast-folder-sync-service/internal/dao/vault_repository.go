@@ -1,0 +1,235 @@
+// Package dao implements the data access layer
+// Package dao 实现数据访问层
+package dao
+
+import (
+	"context"
+	"strconv"
+	"time"
+
+	"github.com/haierkeys/fast-note-sync-service/internal/domain"
+	"github.com/haierkeys/fast-note-sync-service/internal/model"
+	"github.com/haierkeys/fast-note-sync-service/internal/query"
+	"github.com/haierkeys/fast-note-sync-service/pkg/timex"
+	"gorm.io/gorm"
+)
+
+// vaultRepository implements domain.VaultRepository interface
+// vaultRepository 实现 domain.VaultRepository 接口
+type vaultRepository struct {
+	dao             *Dao
+	customPrefixKey string
+}
+
+// NewVaultRepository creates VaultRepository instance
+// NewVaultRepository 创建 VaultRepository 实例
+func NewVaultRepository(dao *Dao) domain.VaultRepository {
+	return &vaultRepository{dao: dao, customPrefixKey: "user_vault_"}
+}
+
+func (r *vaultRepository) GetKey(uid int64) string {
+	return r.customPrefixKey + strconv.FormatInt(uid, 10)
+}
+
+func init() {
+	RegisterModel(ModelConfig{
+		Name: "Vault",
+		RepoFactory: func(d *Dao) daoDBCustomKey {
+			return NewVaultRepository(d).(daoDBCustomKey)
+		},
+	})
+}
+
+// vault gets the vault query object
+// vault 获取保险库查询对象
+func (r *vaultRepository) vault(uid int64) *query.Query {
+	return r.dao.QueryWithOnceInit(func(g *gorm.DB) {
+		model.AutoMigrate(g, "Vault")
+	}, r.GetKey(uid)+"#vault", r.GetKey(uid))
+}
+
+// toDomain converts database model to domain model
+// toDomain 将数据库模型转换为领域模型
+func (r *vaultRepository) toDomain(m *model.Vault) *domain.Vault {
+	if m == nil {
+		return nil
+	}
+	return &domain.Vault{
+		ID:        m.ID,
+		UID:       0, // Field UID not in model, provided by context // 模型中没有 UID 字段，由上下文提供
+		Name:      m.Vault,
+		NoteCount: m.NoteCount,
+		NoteSize:  m.NoteSize,
+		FileCount: m.FileCount,
+		FileSize:  m.FileSize,
+		IsDeleted: m.IsDeleted == 1,
+		CreatedAt: time.Time(m.CreatedAt),
+		UpdatedAt: time.Time(m.UpdatedAt),
+	}
+}
+
+// toModel converts domain model to database model
+// toModel 将领域模型转换为数据库模型
+func (r *vaultRepository) toModel(vault *domain.Vault) *model.Vault {
+	if vault == nil {
+		return nil
+	}
+	isDeleted := int64(0)
+	if vault.IsDeleted {
+		isDeleted = 1
+	}
+	return &model.Vault{
+		ID:        vault.ID,
+		Vault:     vault.Name,
+		NoteCount: vault.NoteCount,
+		NoteSize:  vault.NoteSize,
+		FileCount: vault.FileCount,
+		FileSize:  vault.FileSize,
+		IsDeleted: isDeleted,
+		CreatedAt: timex.Time(vault.CreatedAt),
+		UpdatedAt: timex.Time(vault.UpdatedAt),
+	}
+}
+
+// GetByID retrieves vault by ID
+// GetByID 根据ID获取仓库
+func (r *vaultRepository) GetByID(ctx context.Context, id, uid int64) (*domain.Vault, error) {
+	u := r.vault(uid).Vault
+	m, err := u.WithContext(ctx).Where(u.ID.Eq(id), u.IsDeleted.Eq(0)).First()
+	if err != nil {
+		return nil, err
+	}
+	return r.toDomain(m), nil
+}
+
+// GetByName retrieves vault by name
+// GetByName 根据名称获取仓库
+func (r *vaultRepository) GetByName(ctx context.Context, name string, uid int64) (*domain.Vault, error) {
+	u := r.vault(uid).Vault
+	m, err := u.WithContext(ctx).Where(u.Vault.Eq(name), u.IsDeleted.Eq(0)).First()
+	if err != nil {
+		return nil, err
+	}
+	return r.toDomain(m), nil
+}
+
+// Create creates a vault
+// Create 创建仓库
+func (r *vaultRepository) Create(ctx context.Context, vault *domain.Vault, uid int64) (*domain.Vault, error) {
+	var result *domain.Vault
+	var createErr error
+
+	err := r.dao.ExecuteWrite(ctx, uid, r, func(db *gorm.DB) error {
+		u := query.Use(db).Vault
+		m := &model.Vault{
+			Vault:     vault.Name,
+			NoteCount: vault.NoteCount,
+			NoteSize:  vault.NoteSize,
+			FileCount: vault.FileCount,
+			FileSize:  vault.FileSize,
+			IsDeleted: 0,
+			CreatedAt: timex.Now(),
+			UpdatedAt: timex.Now(),
+		}
+
+		createErr = u.WithContext(ctx).Create(m)
+		if createErr != nil {
+			return createErr
+		}
+		result = r.toDomain(m)
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return result, createErr
+}
+
+// Update updates a vault
+// Update 更新仓库
+func (r *vaultRepository) Update(ctx context.Context, vault *domain.Vault, uid int64) error {
+	return r.dao.ExecuteWrite(ctx, uid, r, func(db *gorm.DB) error {
+		u := query.Use(db).Vault
+		m := r.toModel(vault)
+		m.UpdatedAt = timex.Now()
+
+		return u.WithContext(ctx).Where(u.ID.Eq(vault.ID)).Save(m)
+	})
+}
+
+// UpdateNoteCountSize updates the note count and size of the vault
+// UpdateNoteCountSize 更新仓库的笔记数量和大小
+func (r *vaultRepository) UpdateNoteCountSize(ctx context.Context, noteSize, noteCount, vaultID, uid int64) error {
+	return r.dao.ExecuteWrite(ctx, uid, r, func(db *gorm.DB) error {
+		u := query.Use(db).Vault
+
+		_, err := u.WithContext(ctx).Where(
+			u.ID.Eq(vaultID),
+		).UpdateSimple(
+			u.NoteSize.Value(noteSize),
+			u.NoteCount.Value(noteCount),
+			u.UpdatedAt.Value(timex.Now()),
+		)
+		return err
+	})
+}
+
+// UpdateFileCountSize updates the file count and size of the vault
+// UpdateFileCountSize 更新仓库的文件数量和大小
+func (r *vaultRepository) UpdateFileCountSize(ctx context.Context, fileSize, fileCount, vaultID, uid int64) error {
+	return r.dao.ExecuteWrite(ctx, uid, r, func(db *gorm.DB) error {
+		u := query.Use(db).Vault
+
+		_, err := u.WithContext(ctx).Where(
+			u.ID.Eq(vaultID),
+		).UpdateSimple(
+			u.FileSize.Value(fileSize),
+			u.FileCount.Value(fileCount),
+			u.UpdatedAt.Value(timex.Now()),
+		)
+		return err
+	})
+}
+
+// List retrieves the vault list
+// List 获取仓库列表
+func (r *vaultRepository) List(ctx context.Context, uid int64) ([]*domain.Vault, error) {
+	u := r.vault(uid).Vault
+
+	modelList, err := u.WithContext(ctx).
+		Where(u.IsDeleted.Eq(0)).
+		Order(u.CreatedAt).
+		Limit(100).
+		Order(u.UpdatedAt).
+		Find()
+
+	if err != nil {
+		return nil, err
+	}
+
+	var list []*domain.Vault
+	for _, m := range modelList {
+		list = append(list, r.toDomain(m))
+	}
+	return list, nil
+}
+
+// Delete deletes the vault (soft delete)
+// Delete 删除仓库（软删除）
+func (r *vaultRepository) Delete(ctx context.Context, id, uid int64) error {
+	return r.dao.ExecuteWrite(ctx, uid, r, func(db *gorm.DB) error {
+		u := query.Use(db).Vault
+
+		_, err := u.WithContext(ctx).Where(
+			u.ID.Eq(id),
+		).UpdateSimple(
+			u.IsDeleted.Value(1),
+		)
+		return err
+	})
+}
+
+// Ensure vaultRepository implements domain.VaultRepository interface
+// 确保 vaultRepository 实现了 domain.VaultRepository 接口
+var _ domain.VaultRepository = (*vaultRepository)(nil)

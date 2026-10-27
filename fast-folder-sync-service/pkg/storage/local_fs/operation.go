@@ -1,0 +1,97 @@
+package local_fs
+
+import (
+	"bytes"
+	"errors"
+	"io"
+	"os"
+	"path/filepath"
+	"time"
+
+	"github.com/haierkeys/fast-note-sync-service/pkg/fileurl"
+)
+
+func (p *LocalFS) CheckSave() error {
+
+	savePath := p.getSavePath()
+
+	if err := os.MkdirAll(savePath, 0750); err != nil {
+		return errors.New("failed to create the storage directory: " + err.Error())
+	}
+	if fileurl.IsPermission(savePath) {
+		return errors.New("no permission to upload the save fileurl directory")
+	}
+	p.IsCheckSave = true
+	return nil
+}
+
+func (p *LocalFS) getSavePath() string {
+	fullPath := filepath.Join(p.Config.SavePath, p.Config.CustomPath)
+	return fileurl.PathSuffixCheckAdd(fullPath, string(os.PathSeparator))
+}
+
+// SendFile upload file
+// SendFile 上传文件
+func (p *LocalFS) SendFile(fileKey string, file io.Reader, itype string, modTime time.Time) (string, error) {
+	if !p.IsCheckSave {
+		if err := p.CheckSave(); err != nil {
+			return "", err
+		}
+	}
+
+	dstFileKey := p.getSavePath() + fileKey
+
+	err := os.MkdirAll(filepath.Dir(dstFileKey), os.ModePerm)
+	if err != nil {
+		return "", err
+	}
+
+	out, err := os.Create(dstFileKey)
+	if err != nil {
+		return "", err
+	}
+	defer out.Close()
+
+	// file.Seek(0, 0)
+	_, err = io.Copy(out, file)
+	if err != nil {
+		return "", err
+	} else {
+		if !modTime.IsZero() {
+			_ = os.Chtimes(dstFileKey, modTime, modTime)
+		}
+		return dstFileKey, nil
+	}
+}
+
+func (p *LocalFS) SendContent(fileKey string, content []byte, modTime time.Time) (string, error) {
+
+	if !p.IsCheckSave {
+		if err := p.CheckSave(); err != nil {
+			return "", err
+		}
+	}
+
+	dstFileKey := p.getSavePath() + fileKey
+
+	err := os.MkdirAll(filepath.Dir(dstFileKey), os.ModePerm)
+	if err != nil {
+		return "", err
+	}
+
+	out, err := os.Create(dstFileKey)
+	if err != nil {
+		return "", err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, bytes.NewReader(content))
+	if err != nil {
+		return "", err
+	} else {
+		if !modTime.IsZero() {
+			_ = os.Chtimes(dstFileKey, modTime, modTime)
+		}
+		return dstFileKey, nil
+	}
+}

@@ -1,0 +1,78 @@
+package app
+
+import (
+	"context"
+	"path/filepath"
+
+	"github.com/haierkeys/fast-note-sync-service/internal/dao"
+	pkgapp "github.com/haierkeys/fast-note-sync-service/pkg/app"
+	"github.com/haierkeys/fast-note-sync-service/pkg/fileurl"
+	"github.com/haierkeys/fast-note-sync-service/pkg/util"
+	"github.com/haierkeys/fast-note-sync-service/pkg/workerpool"
+	"github.com/haierkeys/fast-note-sync-service/pkg/writequeue"
+	"go.uber.org/zap"
+	"gorm.io/gorm"
+)
+
+// Infra encapsulates infrastructure dependencies
+type Infra struct {
+	config         *AppConfig
+	logger         *zap.Logger
+	DB             *gorm.DB
+	Dao            *dao.Dao
+	workerPool     *workerpool.Pool
+	writeQueueMgr  *writequeue.Manager
+	TokenManager   pkgapp.TokenManager
+	sourceSelector *fileurl.SourceSelector
+}
+
+// initInfra initializes infrastructure components
+func initInfra(cfg *AppConfig, logger *zap.Logger, db *gorm.DB) (*Infra, error) {
+	// 设置机器唯一标识退回持久化的隐藏文件路径在 config 目录下
+	util.SetUUIDPath(filepath.Join(filepath.Dir(cfg.File), ".server_uuid"))
+
+	infra := &Infra{
+		config:         cfg,
+		logger:         logger,
+		DB:             db,
+		sourceSelector: fileurl.NewSourceSelector(cfg.App.PullSource),
+	}
+
+	// Worker Pool
+	wpConfig := cfg.GetWorkerPoolConfig()
+	infra.workerPool = workerpool.New(&wpConfig, logger)
+
+	// Write Queue Manager
+	wqConfig := cfg.GetWriteQueueConfig()
+	infra.writeQueueMgr = writequeue.New(&wqConfig, logger)
+
+	// DAO
+	dbCfg := cfg.Database
+	dbCfg.RunMode = cfg.Server.RunMode
+
+	userDbCfg := cfg.UserDatabase
+	userDbCfg.RunMode = cfg.Server.RunMode
+
+	// Bleve Manager
+	bleveMgr := dao.NewBleveManager(cfg.App.FtsBleveEnabled, cfg.App.FtsBleveStoreRaw, logger)
+
+	infra.Dao = dao.New(db, context.Background(),
+		dao.WithConfig(&dbCfg),
+		dao.WithUserDatabaseConfig(&userDbCfg),
+		dao.WithLogger(logger),
+		dao.WithWriteQueueManager(infra.writeQueueMgr),
+		dao.WithBleveManager(bleveMgr),
+	)
+
+	// TokenManager
+	tokenConfig := pkgapp.TokenConfig{
+		SecretKey:     cfg.Security.AuthTokenKey,
+		Issuer:        "fast-note-sync-service",
+		Expiry:        cfg.GetTokenExpiry(),
+		ShareTokenKey: cfg.Security.ShareTokenKey,
+		ShareExpiry:   cfg.GetShareTokenExpiry(),
+	}
+	infra.TokenManager = pkgapp.NewTokenManager(tokenConfig)
+
+	return infra, nil
+}

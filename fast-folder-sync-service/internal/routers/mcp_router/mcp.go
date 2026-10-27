@@ -1,0 +1,344 @@
+package mcp_router
+
+import (
+	"bytes"
+	"context"
+	"fmt"
+	"net/http"
+	"net/url"
+	"strings"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	_ "github.com/gookit/goutil/dump"
+	"github.com/haierkeys/fast-note-sync-service/internal/app"
+	"github.com/haierkeys/fast-note-sync-service/internal/config"
+	pkgapp "github.com/haierkeys/fast-note-sync-service/pkg/app"
+	mcpserver "github.com/mark3labs/mcp-go/server"
+)
+
+// endpointRewriter is an http.ResponseWriter wrapper that rewrites the
+// SSE endpoint event from a relative path to an absolute URL.
+// This fixes compatibility with MCP clients (e.g., Hermes/Anthropic Python SDK)
+// that cannot resolve relative endpoint paths returned by mark3labs/mcp-go SSEServer.
+type endpointRewriter struct {
+	http.ResponseWriter
+	absoluteBase string // e.g. "http://192.168.1.89:9000"
+	endpointDone bool
+}
+
+func (w *endpointRewriter) Write(data []byte) (int, error) {
+	if !w.endpointDone && bytes.Contains(data, []byte("event: endpoint")) {
+		w.endpointDone = true
+		// Replace relative path with absolute URL in the endpoint event
+		data = []byte(strings.Replace(
+			string(data),
+			"/api/mcp/message?",
+			w.absoluteBase+"/api/mcp/message?",
+			1,
+		))
+	}
+	return w.ResponseWriter.Write(data)
+}
+
+// Flush implements http.Flusher by delegating to the underlying ResponseWriter.
+// This is required for SSE streaming: mark3labs/mcp-go SSEServer checks for
+// http.Flusher and returns "Streaming unsupported" if it is not implemented.
+// Flush 实现 http.Flusher 接口，透传到底层 ResponseWriter。
+// 这是 SSE 流所必需的：mcp-go SSEServer 会检测 http.Flusher，若未实现则返回 "Streaming unsupported"。
+func (w *endpointRewriter) Flush() {
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+type MCPHandler struct {
+	mcpServer        *mcpserver.MCPServer
+	sseServer        *mcpserver.SSEServer
+	streamableServer *mcpserver.StreamableHTTPServer // StreamableHTTP transport server / StreamableHTTP 传输协议服务
+	ssePingInterval  time.Duration                   // SSE heartbeat interval / SSE 心跳间隔
+	extApiUrl        string                          // External API base URL (from config), used for SSE endpoint rewriting / 外部 API 基础 URL（来自配置），用于 SSE 端点重写
+	cfg              *app.AppConfig
+}
+
+func NewMCPHandler(appContainer *app.App, wss *pkgapp.WebsocketServer) *MCPHandler {
+	cfg := appContainer.Config()
+	pingInterval := time.Duration(cfg.Server.MCPSSEPingInterval) * time.Second
+	if pingInterval <= 0 {
+		pingInterval = 30 * time.Second // fallback default
+	}
+
+	srv := NewMCPServer(appContainer, wss)
+	sseLocalhostOption, streamableLocalhostOption := mcpLocalhostProtectionOptions(cfg.Server.MCPDisableLocalhostProtection)
+
+	sseOptions := []mcpserver.SSEOption{
+		mcpserver.WithMessageEndpoint("/api/mcp/message"),
+		mcpserver.WithKeepAlive(true),
+		mcpserver.WithKeepAliveInterval(pingInterval),
+		sseLocalhostOption,
+		mcpserver.WithSSEContextFunc(func(ctx context.Context, r *http.Request) context.Context {
+			if val := r.Context().Value("uid"); val != nil {
+				ctx = context.WithValue(ctx, "uid", val)
+			}
+			return contextWithMCPRequestInfo(ctx, r, cfg)
+		}),
+	}
+	if cfg.OAuth.Enabled {
+		sseOptions = append(sseOptions, mcpserver.WithSSEProtectedResourceMetadata(cfg.OAuth.ProtectedResourceMetadata()))
+	}
+	sseSrv := mcpserver.NewSSEServer(srv, sseOptions...)
+
+	// StreamableHTTP server shares the same MCPServer instance as SSEServer.
+	// StreamableHTTP 服务与 SSEServer 共享同一 MCPServer 实例。
+	streamableOptions := []mcpserver.StreamableHTTPOption{
+		streamableLocalhostOption,
+		mcpserver.WithHTTPContextFunc(func(ctx context.Context, r *http.Request) context.Context {
+			// uid is pre-injected into the request context by HandleStreamableHTTP
+			// before calling ServeHTTP, so we forward it here.
+			// uid 已由 HandleStreamableHTTP 在调用 ServeHTTP 前注入请求上下文，此处直接透传。
+			if val := r.Context().Value("uid"); val != nil {
+				ctx = context.WithValue(ctx, "uid", val)
+			}
+			return contextWithMCPRequestInfo(ctx, r, cfg)
+		}),
+	}
+	if cfg.OAuth.Enabled {
+		streamableOptions = append(streamableOptions, mcpserver.WithProtectedResourceMetadata(cfg.OAuth.ProtectedResourceMetadata()))
+	}
+	streamableSrv := mcpserver.NewStreamableHTTPServer(srv, streamableOptions...)
+
+	return &MCPHandler{
+		mcpServer:        srv,
+		sseServer:        sseSrv,
+		streamableServer: streamableSrv,
+		ssePingInterval:  pingInterval,
+		extApiUrl:        strings.TrimSuffix(cfg.Server.ExtApiUrl, "/"),
+		cfg:              cfg,
+	}
+}
+
+func mcpLocalhostProtectionOptions(disable bool) (mcpserver.SSEOption, mcpserver.StreamableHTTPOption) {
+	return mcpserver.WithSSEDisableLocalhostProtection(disable), mcpserver.WithDisableLocalhostProtection(disable)
+}
+
+func (h *MCPHandler) HandleSSE(c *gin.Context) {
+	uid := pkgapp.GetUID(c)
+	ctx := context.WithValue(c.Request.Context(), "uid", uid)
+	ctx = contextWithMCPRequestInfo(ctx, c.Request, h.config())
+	if scope, ok := c.Get("scope"); ok {
+		ctx = context.WithValue(ctx, "scope", scope)
+	}
+	if vaults, ok := c.Get("vaults"); ok {
+		ctx = context.WithValue(ctx, "vaults", vaults)
+	}
+
+	// Set SSE headers
+	// 设置 SSE 响应头
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("Proxy-Connection", "keep-alive")
+	c.Header("X-Accel-Buffering", "no") // Disable proxy buffering / 禁用代理缓冲
+
+	// Flush headers immediately
+	// 立即发送响应头
+	c.Writer.Flush()
+
+	// If it's a HEAD request, we've sent the headers, so we can return
+	// 如果是 HEAD 请求，我们已经发送了响应头，可以直接返回
+	if c.Request.Method == http.MethodHead {
+		return
+	}
+
+	// Build absolute URL from the incoming request to fix MCP clients
+	// (e.g., Hermes/Anthropic Python SDK) that cannot resolve relative
+	// endpoint paths returned by mark3labs/mcp-go SSEServer.
+	// See: https://github.com/haierkeys/fast-note-sync-service/issues/258
+	// Priority 1: use the configured ExtApiUrl so that reverse-proxy deployments
+	// return the correct public URL instead of the internal host/port.
+	// Priority 2: fall back to reconstructing from the request (scheme + Host header).
+	// 优先级 1：使用配置的 ExtApiUrl，确保反向代理场景下返回正确的公网 URL。
+	// 优先级 2：回退到从请求重建（scheme + Host）。
+	absoluteBase := h.extApiUrl
+	if absoluteBase == "" {
+		scheme := "http"
+		if c.Request.TLS != nil || c.GetHeader("X-Forwarded-Proto") == "https" {
+			scheme = "https"
+		}
+		absoluteBase = fmt.Sprintf("%s://%s", scheme, c.Request.Host)
+	}
+
+	// Let SSEServer handle the SSE connection, with endpoint URL rewriting
+	rewriter := &endpointRewriter{
+		ResponseWriter: c.Writer,
+		absoluteBase:   absoluteBase,
+	}
+	h.sseServer.SSEHandler().ServeHTTP(rewriter, c.Request.WithContext(ctx))
+}
+
+func (h *MCPHandler) config() *app.AppConfig {
+	return h.cfg
+}
+
+func contextWithMCPRequestInfo(ctx context.Context, r *http.Request, cfg *app.AppConfig) context.Context {
+	var oauthCfg = configlessOAuthDefaults()
+	if cfg != nil {
+		oauthCfg = cfg.OAuth
+		oauthCfg.Normalize()
+	}
+
+	vaultName := r.Header.Get("X-Default-Vault-Name")
+	if vaultName == "" {
+		vaultName = oauthCfg.DefaultVaultName
+	}
+	if vaultName != "" {
+		ctx = context.WithValue(ctx, "default_vault_name", vaultName)
+	}
+
+	clientType := r.Header.Get("X-Client")
+	if clientType == "" {
+		clientType = oauthCfg.DefaultClient
+	}
+	if clientType != "" {
+		ctx = context.WithValue(ctx, "client_type", clientType)
+	}
+
+	clientName := r.Header.Get("X-Client-Name")
+	if clientName == "" {
+		clientName = oauthCfg.DefaultClientName
+		if clientName == "" {
+			clientName = "MCP"
+		}
+	} else {
+		if decoded, err := url.QueryUnescape(clientName); err == nil {
+			clientName = decoded
+		}
+		clientName = "MCP " + clientName
+	}
+	ctx = context.WithValue(ctx, "client_name", clientName)
+
+	clientVersion := r.Header.Get("X-Client-Version")
+	if clientVersion == "" {
+		clientVersion = oauthCfg.DefaultClientVersion
+	}
+	if clientVersion != "" {
+		ctx = context.WithValue(ctx, "client_version", clientVersion)
+	}
+
+	return ctx
+}
+
+func configlessOAuthDefaults() config.OAuthConfig {
+	cfg := config.OAuthConfig{}
+	cfg.Normalize()
+	return cfg
+}
+
+func (h *MCPHandler) HandleMessage(c *gin.Context) {
+	// Inject uid into the request context so the SSEContextFunc can propagate it
+	// to tool handlers during message processing.
+	// 将 uid 注入请求 context，使 SSEContextFunc 能在消息处理时将其传递给工具处理函数。
+	uid := pkgapp.GetUID(c)
+	ctx := context.WithValue(c.Request.Context(), "uid", uid)
+	if scope, ok := c.Get("scope"); ok {
+		ctx = context.WithValue(ctx, "scope", scope)
+	}
+	if vaults, ok := c.Get("vaults"); ok {
+		ctx = context.WithValue(ctx, "vaults", vaults)
+	}
+	h.sseServer.MessageHandler().ServeHTTP(c.Writer, c.Request.WithContext(ctx))
+}
+
+// HandleStreamableHTTP handles the MCP StreamableHTTP transport protocol.
+// It accepts POST (request/notification), GET (SSE listening), and DELETE (session termination).
+// HandleStreamableHTTP 处理 MCP StreamableHTTP 传输协议。
+// 支持 POST（请求/通知）、GET（SSE 监听）和 DELETE（终止会话）。
+//
+// Session-invalid recovery:
+// mark3labs/mcp-go's StreamableHTTPServer returns HTTP 404 "Invalid session ID"
+// when the client's Mcp-Session-Id header is missing or the in-memory session was
+// evicted (e.g. under concurrent load / long-lived clients that lost their session).
+// Clients are not expected to recover from a transport-level 404 by themselves, so
+// we transparently rewrite such responses: when the request is a non-initialize POST
+// and mcp-go rejected it with 404, we buffer the response and, if the body indicates
+// an invalid/terminated session, return a JSON-RPC error instead so well-behaved
+// MCP clients can re-initialize and retry. The original 404 is preserved for GET/DELETE.
+//
+// Session 失效自动恢复:
+// mcp-go 的 StreamableHTTPServer 在客户端 Mcp-Session-Id 头缺失或内存会话被淘汰时
+// （如并发负载下、长连接客户端会话丢失）会返回 HTTP 404 "Invalid session ID"。
+// 客户端通常无法自行从传输层 404 恢复，因此这里对非 initialize 的 POST 请求做透明改写：
+// 缓冲响应，若 body 表明会话无效/已终止，则改为返回 JSON-RPC 错误，让符合规范的
+// MCP 客户端可以重新 initialize 并重试。GET/DELETE 请求保持原始 404 语义。
+func (h *MCPHandler) HandleStreamableHTTP(c *gin.Context) {
+	uid := pkgapp.GetUID(c)
+	// Pre-inject uid into the request context so that WithHTTPContextFunc can forward it.
+	// 将 uid 预注入请求 context，以便 WithHTTPContextFunc 能够透传。
+	ctx := context.WithValue(c.Request.Context(), "uid", uid)
+	if scope, ok := c.Get("scope"); ok {
+		ctx = context.WithValue(ctx, "scope", scope)
+	}
+	if vaults, ok := c.Get("vaults"); ok {
+		ctx = context.WithValue(ctx, "vaults", vaults)
+	}
+
+	if c.Request.Method == http.MethodPost && c.GetHeader(HeaderKeySessionID) == "" {
+		// No session header at all: let mcp-go handle it (initialize will generate one).
+		// 完全没有 session 头：交给 mcp-go 处理（initialize 会生成新会话）。
+		h.streamableServer.ServeHTTP(c.Writer, c.Request.WithContext(ctx))
+		return
+	}
+
+	// Wrap the response writer to detect session-invalid 404s on POST and convert
+	// them into a JSON-RPC error the client can recover from.
+	// 包装响应写入器，检测 POST 请求上的 session 无效 404，并转换为客户端可恢复的 JSON-RPC 错误。
+	rec := &sessionRecoveryWriter{ResponseWriter: c.Writer, status: http.StatusOK}
+	h.streamableServer.ServeHTTP(rec, c.Request.WithContext(ctx))
+
+	if rec.status == http.StatusNotFound && c.Request.Method == http.MethodPost && rec.isJSONRPC {
+		// mcp-go rejected the request because the session is unknown/invalid.
+		// Return a JSON-RPC error with a clear code so clients can re-initialize.
+		// mcp-go 因会话未知/无效拒绝了请求。返回带明确错误码的 JSON-RPC 错误，客户端可重新初始化。
+		body := `{"jsonrpc":"2.0","id":null,"error":{"code":-32001,"message":"MCP session not found or invalid. Re-initialize the session and retry.","data":{"retryable":true}}}`
+		c.Header("Content-Type", "application/json")
+		c.Writer.WriteHeader(http.StatusOK)
+		_, _ = c.Writer.Write([]byte(body))
+		return
+	}
+
+	// Non-404 responses were already written by mcp-go (including error bodies).
+	// 非 404 响应已由 mcp-go 写入（含错误体）。
+}
+
+// HeaderKeySessionID mirrors mcp-go's session header key without importing it here.
+// 与 mcp-go 的会话头键保持一致（避免额外导入）。
+const HeaderKeySessionID = "Mcp-Session-Id"
+
+// sessionRecoveryWriter buffers the status and inspects whether the body is JSON-RPC,
+// so HandleStreamableHTTP can detect transport-level session rejection (HTTP 404).
+// sessionRecoveryWriter 记录响应状态并检查 body 是否为 JSON-RPC，
+// 以便 HandleStreamableHTTP 识别传输层的会话拒绝（HTTP 404）。
+type sessionRecoveryWriter struct {
+	http.ResponseWriter
+	status    int
+	isJSONRPC bool
+}
+
+func (w *sessionRecoveryWriter) WriteHeader(status int) {
+	w.status = status
+	w.ResponseWriter.WriteHeader(status)
+}
+
+func (w *sessionRecoveryWriter) Write(data []byte) (int, error) {
+	trimmed := bytes.TrimSpace(data)
+	if len(trimmed) > 0 && trimmed[0] == '{' {
+		w.isJSONRPC = true
+	}
+	return w.ResponseWriter.Write(data)
+}
+
+func (w *sessionRecoveryWriter) Flush() {
+	if f, ok := w.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}

@@ -1,0 +1,48 @@
+name: Desktop checks and Windows build
+on:
+  push:
+    paths: ["desktop/**", ".github/workflows/desktop.yml"]
+  pull_request:
+    paths: ["desktop/**", ".github/workflows/desktop.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npm run check
+      - run: npm test
+  windows:
+    if: github.event_name == 'workflow_dispatch'
+    needs: test
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - run: npm ci
+      - run: npm run dist:win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Fast-Folder-Sync-Windows-x64
+          path: desktop/release/*.exe

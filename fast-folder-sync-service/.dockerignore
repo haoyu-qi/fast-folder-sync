@@ -1,0 +1,7 @@
+.git
+**/node_modules
+build
+storage
+*.exe
+*.zip
+*.log

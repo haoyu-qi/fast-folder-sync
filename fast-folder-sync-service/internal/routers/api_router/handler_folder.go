@@ -1,0 +1,222 @@
+package api_router
+
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/haierkeys/fast-note-sync-service/internal/app"
+	"github.com/haierkeys/fast-note-sync-service/internal/dto"
+	pkgapp "github.com/haierkeys/fast-note-sync-service/pkg/app"
+	"github.com/haierkeys/fast-note-sync-service/pkg/code"
+	apperrors "github.com/haierkeys/fast-note-sync-service/pkg/errors"
+	"go.uber.org/zap"
+)
+
+type FolderHandler struct {
+	*Handler
+}
+
+func NewFolderHandler(appContainer *app.App) *FolderHandler {
+	return &FolderHandler{Handler: NewHandler(appContainer)}
+}
+
+// Get retrieves a folder
+// @Summary Get folder info
+// @Description Get folder info for current user by path or pathHash
+// @Tags Folder
+// @Security UserAuthToken
+// @Produce json
+// @Param params query dto.FolderGetRequest true "Query Parameters"
+// @Success 200 {object} pkgapp.Res{data=dto.FolderDTO} "Success"
+// @Router /api/folder [get]
+func (h *FolderHandler) Get(c *gin.Context) {
+	response := pkgapp.NewResponse(c)
+	params := &dto.FolderGetRequest{}
+	if valid, errs := pkgapp.BindAndValid(c, params); !valid {
+		h.App.Logger().Error("FolderHandler.Get.BindAndValid errs", zap.Error(errs))
+		response.ToResponse(code.ErrorInvalidParams.WithDetails(errs.ErrorsToString()).WithData(errs.MapsToString()))
+		return
+	}
+
+	uid := pkgapp.GetUID(c)
+	res, err := h.App.GetFolderService(h.getClientInfo(c)).Get(c.Request.Context(), uid, params)
+	if err != nil {
+		apperrors.ErrorResponse(c, err)
+		return
+	}
+
+	response.ToResponse(code.Success.WithData(res))
+}
+
+// List retrieves folder list
+// @Summary Get folder list
+// @Description Get folder list for current user by parent path or pathHash
+// @Tags Folder
+// @Security UserAuthToken
+// @Produce json
+// @Param params query dto.FolderListRequest true "Query Parameters"
+// @Success 200 {object} pkgapp.Res{data=[]dto.FolderDTO} "Success"
+// @Router /api/folders [get]
+func (h *FolderHandler) List(c *gin.Context) {
+	response := pkgapp.NewResponse(c)
+	params := &dto.FolderListRequest{}
+	if valid, errs := pkgapp.BindAndValid(c, params); !valid {
+		h.App.Logger().Error("FolderHandler.List.BindAndValid errs", zap.Error(errs))
+		response.ToResponse(code.ErrorInvalidParams.WithDetails(errs.ErrorsToString()).WithData(errs.MapsToString()))
+		return
+	}
+
+	uid := pkgapp.GetUID(c)
+	res, err := h.App.GetFolderService(h.getClientInfo(c)).List(c.Request.Context(), uid, params)
+	if err != nil {
+		apperrors.ErrorResponse(c, err)
+		return
+	}
+
+	response.ToResponse(code.Success.WithData(res))
+}
+
+// Create creates a folder
+// @Summary Create folder
+// @Description Create a new folder or restore a deleted one by path
+// @Tags Folder
+// @Security UserAuthToken
+// @Accept json
+// @Produce json
+// @Param params body dto.FolderCreateRequest true "Create Parameters"
+// @Success 200 {object} pkgapp.Res{data=dto.FolderDTO} "Success"
+// @Router /api/folder [post]
+func (h *FolderHandler) Create(c *gin.Context) {
+	response := pkgapp.NewResponse(c)
+	params := &dto.FolderCreateRequest{}
+	if valid, errs := pkgapp.BindAndValid(c, params); !valid {
+		h.App.Logger().Error("FolderHandler.Create.BindAndValid errs", zap.Error(errs))
+		response.ToResponse(code.ErrorInvalidParams.WithDetails(errs.ErrorsToString()).WithData(errs.MapsToString()))
+		return
+	}
+
+	uid := pkgapp.GetUID(c)
+	res, err := h.App.GetFolderService(h.getClientInfo(c)).UpdateOrCreate(c.Request.Context(), uid, params)
+	if err != nil {
+		apperrors.ErrorResponse(c, err)
+		return
+	}
+
+	response.ToResponse(code.Success.WithData(res))
+}
+
+// Delete deletes a folder
+// @Summary Delete folder
+// @Description Soft delete a folder by path or pathHash
+// @Tags Folder
+// @Security UserAuthToken
+// @Accept json
+// @Produce json
+// @Param params body dto.FolderDeleteRequest true "Delete Parameters"
+// @Success 200 {object} pkgapp.Res "Success"
+// @Router /api/folder [delete]
+func (h *FolderHandler) Delete(c *gin.Context) {
+	response := pkgapp.NewResponse(c)
+	params := &dto.FolderDeleteRequest{}
+	if valid, errs := pkgapp.BindAndValid(c, params); !valid {
+		h.App.Logger().Error("FolderHandler.Delete.BindAndValid errs", zap.Error(errs))
+		response.ToResponse(code.ErrorInvalidParams.WithDetails(errs.ErrorsToString()).WithData(errs.MapsToString()))
+		return
+	}
+
+	uid := pkgapp.GetUID(c)
+	_, err := h.App.GetFolderService(h.getClientInfo(c)).Delete(c.Request.Context(), uid, params)
+	if err != nil {
+		apperrors.ErrorResponse(c, err)
+		return
+	}
+
+	response.ToResponse(code.Success)
+}
+
+// ListNotes retrieves notes in a folder
+// @Summary List notes in folder
+// @Description List non-deleted notes in a specific folder with pagination and sorting
+// @Tags Folder
+// @Security UserAuthToken
+// @Produce json
+// @Param params query dto.FolderContentRequest true "Query Parameters"
+// @Param pagination query pkgapp.PaginationRequest true "Pagination Parameters"
+// @Success 200 {object} pkgapp.Res{data=pkgapp.ListRes{list=[]dto.NoteDTO}} "Success"
+// @Router /api/folder/notes [get]
+func (h *FolderHandler) ListNotes(c *gin.Context) {
+	response := pkgapp.NewResponse(c)
+	params := &dto.FolderContentRequest{}
+	if valid, errs := pkgapp.BindAndValid(c, params); !valid {
+		h.App.Logger().Error("FolderHandler.ListNotes.BindAndValid errs", zap.Error(errs))
+		response.ToResponse(code.ErrorInvalidParams.WithDetails(errs.ErrorsToString()).WithData(errs.MapsToString()))
+		return
+	}
+
+	uid := pkgapp.GetUID(c)
+	pager := pkgapp.NewPager(c)
+
+	res, count, err := h.App.GetFolderService(h.getClientInfo(c)).ListNotes(c.Request.Context(), uid, params, pager)
+	if err != nil {
+		apperrors.ErrorResponse(c, err)
+		return
+	}
+
+	response.ToResponseList(code.Success, res, count)
+}
+
+// ListFiles retrieves files in a folder
+// @Summary List files in folder
+// @Description List non-deleted files in a specific folder with pagination and sorting
+// @Tags Folder
+// @Security UserAuthToken
+// @Produce json
+// @Param params query dto.FolderContentRequest true "Query Parameters"
+// @Param params query pkgapp.PaginationRequest true "Query Parameters"
+// @Success 200 {object} pkgapp.Res{data=pkgapp.ListRes{list=[]dto.FileDTO}} "Success"
+// @Router /api/folder/files [get]
+func (h *FolderHandler) ListFiles(c *gin.Context) {
+	response := pkgapp.NewResponse(c)
+	params := &dto.FolderContentRequest{}
+	if valid, errs := pkgapp.BindAndValid(c, params); !valid {
+		h.App.Logger().Error("FolderHandler.ListFiles.BindAndValid errs", zap.Error(errs))
+		response.ToResponse(code.ErrorInvalidParams.WithDetails(errs.ErrorsToString()).WithData(errs.MapsToString()))
+		return
+	}
+
+	uid := pkgapp.GetUID(c)
+	pager := pkgapp.NewPager(c)
+	res, count, err := h.App.GetFolderService(h.getClientInfo(c)).ListFiles(c.Request.Context(), uid, params, pager)
+	if err != nil {
+		apperrors.ErrorResponse(c, err)
+		return
+	}
+
+	response.ToResponseList(code.Success, res, count)
+}
+
+// Tree returns the complete folder tree structure
+// @Summary Get folder tree
+// @Description Get the complete folder tree structure for a vault
+// @Tags Folder
+// @Security UserAuthToken
+// @Produce json
+// @Param params query dto.FolderTreeRequest true "Query Parameters"
+// @Success 200 {object} pkgapp.Res{data=dto.FolderTreeResponse} "Success"
+// @Router /api/folder/tree [get]
+func (h *FolderHandler) Tree(c *gin.Context) {
+	response := pkgapp.NewResponse(c)
+	params := &dto.FolderTreeRequest{}
+	if valid, errs := pkgapp.BindAndValid(c, params); !valid {
+		h.App.Logger().Error("FolderHandler.Tree.BindAndValid errs", zap.Error(errs))
+		response.ToResponse(code.ErrorInvalidParams.WithDetails(errs.ErrorsToString()).WithData(errs.MapsToString()))
+		return
+	}
+
+	uid := pkgapp.GetUID(c)
+	res, err := h.App.GetFolderService(h.getClientInfo(c)).GetTree(c.Request.Context(), uid, params)
+	if err != nil {
+		apperrors.ErrorResponse(c, err)
+		return
+	}
+
+	response.ToResponse(code.Success.WithData(res))
+}

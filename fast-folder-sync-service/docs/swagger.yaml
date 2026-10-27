@@ -1,0 +1,5344 @@
+basePath: /
+definitions:
+  api_router.HealthResponse:
+    properties:
+      database:
+        description: '"connected" or "error" // "connected" 或 "error"'
+        type: string
+      status:
+        description: '"healthy" or "unhealthy" // "healthy" 或 "unhealthy"'
+        type: string
+      uptime:
+        description: Uptime (seconds) // 运行时间（秒）
+        type: number
+      version:
+        description: Service version number // 服务版本号
+        type: string
+    type: object
+  app.HistoricalVersion:
+    properties:
+      changelogContent:
+        description: Changelog content // 更新日志内容
+        type: string
+      version:
+        description: Version name // 版本号
+        type: string
+    type: object
+  app.ListRes:
+    properties:
+      list:
+        description: Data list // 数据清单
+      pager:
+        allOf:
+        - $ref: '#/definitions/app.Pager'
+        description: Pagination info // 翻页信息
+    type: object
+  app.Pager:
+    properties:
+      page:
+        description: Page number // 页码
+        type: integer
+      pageSize:
+        description: Page size // 每页数量
+        type: integer
+      totalRows:
+        description: Total rows // 总行数
+        type: integer
+    type: object
+  app.Res:
+    properties:
+      code:
+        type: integer
+      context: {}
+      data: {}
+      details: {}
+      message: {}
+      pageIndex:
+        description: '1-BASED wire value: 0/absent = non-paginated message, n>0 =
+          download page n-1 (internal 0-based). 1-based so page 0 stays distinguishable
+          from non-paginated messages under proto3 zero-value elision; only set for
+          paginated download messages on pv>=2 connections. Client-to-server PageAck.pageIndex
+          stays 0-based. // 线上值为 1-BASED：0/缺省 = 非分页消息，n>0 = 下载页 n-1（内部 0-based）。采用
+          1-based 是为了让第 0 页在 proto3 零值不编码规则下仍可与非分页消息区分；仅 pv>=2 连接的分页下载消息会设置。客户端→服务端的
+          PageAck.pageIndex 保持 0-based'
+      path: {}
+      status:
+        type: boolean
+      vault: {}
+    type: object
+  app.WSClientInfo:
+    properties:
+      clientName:
+        type: string
+      clientType:
+        type: string
+      clientVersion:
+        type: string
+      nickname:
+        type: string
+      platformInfo:
+        additionalProperties:
+          type: boolean
+        type: object
+      remoteAddr:
+        type: string
+      startTime:
+        type: string
+      tokenId:
+        type: integer
+      traceId:
+        type: string
+      uid:
+        type: string
+    type: object
+  dto.AdminCPUInfo:
+    properties:
+      loadAvg:
+        allOf:
+        - $ref: '#/definitions/dto.AdminLoadInfo'
+        description: Load average // 平均负载
+      logicalCores:
+        description: Logical cores // 逻辑核心数
+        type: integer
+      modelName:
+        description: Model name // 型号
+        type: string
+      percent:
+        description: Usage percentage per core // 每个核心的使用率
+        items:
+          type: number
+        type: array
+      physicalCores:
+        description: Physical cores // 物理核心数
+        type: integer
+    type: object
+  dto.AdminCheckResponse:
+    properties:
+      isAdmin:
+        description: Whether have admin privileges // 是否具有管理员权限
+        type: boolean
+    type: object
+  dto.AdminCloudflareConfig:
+    properties:
+      enabled:
+        description: Whether to enable cloudflare tunnel // 是否启用 cloudflare 隧道
+        type: boolean
+      logEnabled:
+        description: Whether to enable cloudflare tunnel logging // 是否开启 cloudflare
+          隧道日志
+        type: boolean
+      token:
+        description: cloudflare tunnel token // cloudflare 隧道令牌
+        type: string
+    type: object
+  dto.AdminConfig:
+    properties:
+      adminUid:
+        description: Admin UID // 管理员 UID
+        type: integer
+      authTokenKey:
+        description: Auth token key // 认证 Token 密钥
+        type: string
+      customResponseHeaders:
+        additionalProperties:
+          type: string
+        description: Custom HTTP response headers // 自定义 HTTP 响应头
+        type: object
+      defaultApiFolder:
+        description: Default API folder // 默认 API 目录
+        type: string
+      defaultContextTimeout:
+        description: Default context timeout // 默认上下文超时
+        type: integer
+      defaultPageSize:
+        description: Default page size // 默认每页显示数
+        type: integer
+      downloadSessionTimeout:
+        description: Download session timeout // 下载分片超时
+        type: string
+      fileChunkSize:
+        description: File chunk size // 文件分块大小
+        type: string
+      fontSet:
+        description: Font set // 字体设置
+        type: string
+      ftsBleveEnabled:
+        description: Whether Bleve FTS is enabled // 是否启用 Bleve 全文搜索
+        type: boolean
+      ftsBleveStoreRaw:
+        description: Whether Bleve stores raw content // Bleve 全文搜索是否存储原始文本
+        type: boolean
+      gitEmail:
+        description: Git author email // Git 提交的作者邮箱
+        type: string
+      gitName:
+        description: Git author name // Git 提交的作者名称
+        type: string
+      historyKeepVersions:
+        description: History versions to keep // 历史版本保留数
+        type: integer
+      historySaveDelay:
+        description: History save delay // 历史保存延迟
+        type: string
+      isReturnSussess:
+        description: Whether to return success detail // 是否返回成功详情
+        type: boolean
+      maxPageSize:
+        description: Max page size // 最大每页显示限制
+        type: integer
+      pipelineWindowDown:
+        description: Download pipeline window size for pv>=2 connections; 0 = stop-and-wait
+          // pv>=2 连接的下行流水线窗口大小；0 = stop-and-wait
+        type: integer
+      pipelineWindowUp:
+        description: Upload pipeline window size for pv>=2 connections; 0 = stop-and-wait
+          // pv>=2 连接的上行流水线窗口大小；0 = stop-and-wait
+        type: integer
+      pullReleaseChannel:
+        description: 'Update version channel: stable | beta // 更新版本通道：stable | beta'
+        type: string
+      pullSource:
+        description: 'Data pull source: auto | github | cnb // 数据拉取源：auto | github
+          | cnb'
+        type: string
+      registerIsEnable:
+        description: Registration enablement // 是否开启注册
+        type: boolean
+      shareTokenExpiry:
+        description: Share token expiry // 分享 Token 有效期
+        type: string
+      shareTokenKey:
+        description: Share token key // 分享 Token 密钥
+        type: string
+      softDeleteRetentionTime:
+        description: Soft delete retention time // 软删除保留时间
+        type: string
+      syncLogRetentionTime:
+        description: Sync log retention time // 同步日志保留时长
+        type: string
+      tempPath:
+        description: Temporary file path // 临时文件路径
+        type: string
+      tokenExpiry:
+        description: Token expiry // Token 有效期
+        type: string
+      uploadSessionTimeout:
+        description: Upload session timeout // 上传会话超时时间
+        type: string
+      webguiLoginTokenBindIp:
+        description: WebGUI login token bind IP // WebGUI 登录 Token 是否绑定 IP
+        type: boolean
+      webguiLoginTokenExpiry:
+        description: WebGUI login token expiry // WebGUI 登录 Token 有效期
+        type: string
+      workerPoolMaxWorkers:
+        description: Worker pool max workers // 协程池最大协程数
+        type: integer
+      workerPoolQueueSize:
+        description: Worker pool queue size // 协程池队列大小
+        type: integer
+      writeQueueCapacity:
+        description: Write queue capacity // 写入队列容量
+        type: integer
+      writeQueueIdleTime:
+        description: Write queue idle cleanup time // 写入队列空闲清理时长
+        type: string
+      writeQueueTimeout:
+        description: Write queue timeout // 写入队列超时
+        type: string
+      wsCheckUtf8Enabled:
+        description: Whether ws check UTF-8 is enabled // WebSocket 是否开启 UTF-8 校验
+        type: boolean
+      wsCompressionEnabled:
+        description: Whether ws compression is enabled // WebSocket 是否开启压缩
+        type: boolean
+      wsCompressionLevel:
+        description: Ws compression level // WebSocket 压缩级别
+        type: integer
+      wsCompressionThreshold:
+        description: Ws compression threshold // WebSocket 压缩阈值
+        type: integer
+      wsParallelEnabled:
+        description: Whether ws parallel is enabled // WebSocket 并行处理是否开启
+        type: boolean
+      wsParallelGolimit:
+        description: Ws parallel goroutine limit // WebSocket 并行协程限制
+        type: integer
+      wsReadMaxPayloadSize:
+        description: WebSocket max read payload // WebSocket 最大读取负载
+        type: string
+      wsWriteMaxPayloadSize:
+        description: WebSocket max write payload // WebSocket 最大写入负载
+        type: string
+    type: object
+  dto.AdminHostInfo:
+    properties:
+      arch:
+        description: Architecture // 架构
+        type: string
+      currentTime:
+        description: Current system time // 当前系统时间
+        type: string
+      hostname:
+        description: Hostname // 主机名
+        type: string
+      kernelVersion:
+        description: Kernel version // 内核版本
+        type: string
+      os:
+        description: Operating system // 操作系统
+        type: string
+      osPretty:
+        description: Detailed OS name // 详细操作系统名称
+        type: string
+      platform:
+        description: Platform name // 平台
+        type: string
+      timezone:
+        description: Time zone name // 时区名称
+        type: string
+      timezoneOffset:
+        description: Time zone offset in seconds // 时区偏移（秒）
+        type: integer
+      uptime:
+        description: System uptime // 系统运行时间
+        type: integer
+    type: object
+  dto.AdminLoadInfo:
+    properties:
+      load1:
+        description: Load 1 min // 1分钟负载
+        type: number
+      load5:
+        description: Load 5 min // 5分钟负载
+        type: number
+      load15:
+        description: Load 15 min // 15分钟负载
+        type: number
+    type: object
+  dto.AdminMemoryInfo:
+    properties:
+      available:
+        description: Available memory // 可用内存
+        type: integer
+      swapTotal:
+        description: Total swap space // 交换区总量
+        type: integer
+      swapUsed:
+        description: Used swap space // 交换区已用
+        type: integer
+      swapUsedPercent:
+        description: Swap usage percentage // 交换区使用率
+        type: number
+      total:
+        description: Total physical memory // 系统总内存
+        type: integer
+      used:
+        description: Used memory // 已用内存
+        type: integer
+      usedPercent:
+        description: Memory usage percentage // 内存使用率
+        type: number
+    type: object
+  dto.AdminProcessInfo:
+    properties:
+      cpuPercent:
+        description: CPU Usage percentage // CPU 使用率
+        type: number
+      memoryPercent:
+        description: Memory Usage percentage // 内存使用率
+        type: number
+      name:
+        description: Process Name // 进程名称
+        type: string
+      pid:
+        description: Process ID // 进程 ID
+        type: integer
+      ppid:
+        description: Parent Process ID // 父进程 ID
+        type: integer
+    type: object
+  dto.AdminRuntimeInfo:
+    properties:
+      buckHashSys:
+        description: Memory obtained from system for profiling bucket hash table (bytes)
+          // 分析桶哈希表占用的系统内存
+        type: integer
+      gcSys:
+        description: Memory obtained from system for metadata for GC (bytes) // GC
+          元数据占用的系统内存
+        type: integer
+      heapIdle:
+        description: Memory in idle spans (bytes) // 空闲 Span 占用的内存
+        type: integer
+      heapInuse:
+        description: Memory in in-use spans (bytes) // 正在使用的 Span 占用的内存
+        type: integer
+      heapReleased:
+        description: Memory released to OS (bytes) // 释放回操作系统的内存（字节）
+        type: integer
+      heapSys:
+        description: Memory obtained from system for heap (bytes) // 堆占用的系统内存
+        type: integer
+      mCacheSys:
+        description: Memory obtained from system for mcache (bytes) // mcache 占用的系统内存
+        type: integer
+      mSpanSys:
+        description: Memory obtained from system for mspan (bytes) // mspan 占用的系统内存
+        type: integer
+      memAlloc:
+        description: Allocated memory (bytes) // 已分配内存（字节）
+        type: integer
+      memSys:
+        description: Memory obtained from system (bytes) // 从系统获取的内存（字节）
+        type: integer
+      memTotal:
+        description: Total memory allocated (bytes) // 累计分配内存（字节）
+        type: integer
+      nextGc:
+        description: Target heap size for the next GC cycle // 下次 GC 的目标堆大小
+        type: integer
+      numGc:
+        description: Number of completed GC cycles // GC 次数
+        type: integer
+      numGoroutine:
+        description: Number of goroutines // Goroutine 数量
+        type: integer
+      otherSys:
+        description: Other system memory (bytes) // 其他系统内存
+        type: integer
+      stackSys:
+        description: Memory obtained from system for stack (bytes) // 栈占用的系统内存
+        type: integer
+    type: object
+  dto.AdminSystemInfo:
+    properties:
+      cpu:
+        allOf:
+        - $ref: '#/definitions/dto.AdminCPUInfo'
+        description: CPU information // CPU 信息
+      host:
+        allOf:
+        - $ref: '#/definitions/dto.AdminHostInfo'
+        description: Host information // 主机信息
+      memory:
+        allOf:
+        - $ref: '#/definitions/dto.AdminMemoryInfo'
+        description: Memory information // 内存信息
+      process:
+        allOf:
+        - $ref: '#/definitions/dto.AdminProcessInfo'
+        description: Process information // 进程信息
+      runtimeStatus:
+        allOf:
+        - $ref: '#/definitions/dto.AdminRuntimeInfo'
+        description: Go runtime status // Go 运行时状态
+      startTime:
+        description: Start time // 启动时间
+        type: string
+      uptime:
+        description: Uptime (seconds) // 运行时间（秒）
+        type: number
+    type: object
+  dto.AdminUserDatabaseConfig:
+    properties:
+      charset:
+        description: Charset // 字符集
+        type: string
+      connMaxIdleTime:
+        description: Connection max idle time // 空闲连接最大生命周期
+        type: string
+      connMaxLifetime:
+        description: Connection max lifetime // 连接最大生命周期
+        type: string
+      host:
+        description: Host // 主机
+        type: string
+      maxIdleConns:
+        description: Max idle connections // 最大闲置连接数
+        type: integer
+      maxOpenConns:
+        description: Max open connections // 最大打开连接数
+        type: integer
+      maxWriteConcurrency:
+        description: Max write concurrency // 最大并发写入数
+        type: integer
+      name:
+        description: Database name // 数据库名
+        type: string
+      parseTime:
+        description: Parse time // 是否解析时间
+        type: boolean
+      password:
+        description: Password // 密码
+        type: string
+      path:
+        description: SQLite database file path // SQLite 数据库文件路径
+        type: string
+      port:
+        description: Port // 端口
+        type: integer
+      schema:
+        description: Database schema (postgres only) // 数据库 Schema
+        type: string
+      sslMode:
+        description: SSL mode (postgres only) // SSL 模式
+        type: string
+      type:
+        description: Database type (mysql, postgres, sqlite) // 数据库类型
+        enum:
+        - mysql
+        - postgres
+        - sqlite
+        type: string
+      userName:
+        description: Username // 用户名
+        type: string
+    type: object
+  dto.AdminWebGUIConfig:
+    properties:
+      fontSet:
+        description: Font set // 字体设置
+        type: string
+      ftsBleveEnabled:
+        description: Whether Bleve FTS is enabled // 是否启用 Bleve 全文搜索
+        type: boolean
+      registerIsEnable:
+        description: Registration enablement // 是否开启注册
+        type: boolean
+    type: object
+  dto.BackupConfigDTO:
+    properties:
+      createdAt:
+        description: Created at // 创建时间
+        type: string
+      cronExpression:
+        description: Cron expression // Cron表达式
+        type: string
+      cronStrategy:
+        description: Cron strategy // 定时策略
+        type: string
+      id:
+        description: Config ID // 配置ID
+        type: integer
+      includeVaultName:
+        description: Whether sync path includes vault name // 同步路径是否包含仓库名
+        type: boolean
+      isEnabled:
+        description: Is enabled // 是否启用
+        type: boolean
+      lastMessage:
+        description: Last run result message // 上次运行结果消息
+        type: string
+      lastRunTime:
+        description: Last run time // 上次运行时间
+        type: string
+      lastStatus:
+        description: Last status (0:Idle, 1:Running, 2:Success, 3:Failed, 4:Stopped)
+          // 上次状态 (0:Idle, 1:Running, 2:Success, 3:Failed, 4:Stopped)
+        type: integer
+      nextRunTime:
+        description: Next run time // 下次运行时间
+        type: string
+      passwordMode:
+        description: Password mode (0:None, 1:Fixed, 2:Random) // 密码模式 (0:无密码, 1:固定密码,
+          2:随机密码)
+        type: integer
+      passwordValue:
+        description: Password value for fixed mode // 固定密码值
+        type: string
+      retentionDays:
+        description: Retention days // 保留天数
+        type: integer
+      storageIds:
+        description: Storage ID list // 存储ID列表
+        type: string
+      type:
+        description: Backup type (full, incremental, sync) // 备份类型 (full, incremental,
+          sync)
+        type: string
+      uid:
+        description: User UID // 用户ID
+        type: integer
+      updatedAt:
+        description: Updated at // 更新时间
+        type: string
+      vault:
+        description: Associated vault name // 关联库名称
+        type: string
+    type: object
+  dto.BackupConfigRequest:
+    properties:
+      cronExpression:
+        description: Cron expression // Cron 表达式
+        example: 0 0 * * *
+        type: string
+      cronStrategy:
+        description: Cron strategy // 定时策略
+        enum:
+        - daily
+        - weekly
+        - monthly
+        - custom
+        example: daily
+        type: string
+      id:
+        description: ID // ID
+        example: 1
+        type: integer
+      includeVaultName:
+        description: Include vault name // 同步路径是否包含仓库名
+        example: false
+        type: boolean
+      isEnabled:
+        description: Is enabled // 是否启用
+        example: true
+        type: boolean
+      passwordMode:
+        description: Password mode (0:None, 1:Fixed, 2:Random) // 密码模式 (0:无密码, 1:固定密码,
+          2:随机密码)
+        example: 0
+        type: integer
+      passwordValue:
+        description: Password value for fixed mode // 固定密码值
+        example: "123456"
+        type: string
+      retentionDays:
+        description: Retention days // 保留天数
+        example: 7
+        minimum: -1
+        type: integer
+      storageIds:
+        description: Storage IDs // 存储 ID 列表
+        example: '[1, 2]'
+        type: string
+      type:
+        description: Backup type // 备份类型
+        enum:
+        - full
+        - incremental
+        - sync
+        example: sync
+        type: string
+      vault:
+        description: Vault name // 仓库名称
+        example: test
+        type: string
+    required:
+    - cronStrategy
+    - storageIds
+    - type
+    type: object
+  dto.BackupExecuteRequest:
+    properties:
+      id:
+        description: ID // ID
+        example: 1
+        type: integer
+    type: object
+  dto.BackupHistoryDTO:
+    properties:
+      configId:
+        description: Config ID // 配置ID
+        type: integer
+      createdAt:
+        description: Created at // 创建时间
+        type: string
+      endTime:
+        description: End time // 结束时间
+        type: string
+      fileCount:
+        description: File count // 文件数量
+        type: integer
+      filePath:
+        description: File path // 文件路径
+        type: string
+      fileSize:
+        description: File size // 文件大小
+        type: integer
+      id:
+        description: History record ID // 历史记录ID
+        type: integer
+      message:
+        description: Result message // 结果消息
+        type: string
+      password:
+        description: Password // 密码
+        type: string
+      startTime:
+        description: Start time // 开始时间
+        type: string
+      status:
+        description: Status (0:Idle, 1:Running, 2:Success, 3:Failed, 4:Stopped) //
+          状态 (0:Idle, 1:Running, 2:Success, 3:Failed, 4:Stopped)
+        type: integer
+      storageId:
+        description: Storage ID // 存储ID
+        type: integer
+      type:
+        description: Backup type // 备份类型
+        type: string
+      uid:
+        description: User UID // 用户ID
+        type: integer
+      updatedAt:
+        description: Updated at // 更新时间
+        type: string
+    type: object
+  dto.FileDTO:
+    properties:
+      contentHash:
+        description: Content hash // 内容哈希
+        type: string
+      createdAt:
+        description: Created at time // 创建时间
+        type: string
+      ctime:
+        description: Creation timestamp // 创建时间戳
+        type: integer
+      id:
+        description: File ID // 文件 ID
+        type: integer
+      lastTime:
+        description: Updated timestamp // 更新时间戳
+        type: integer
+      mtime:
+        description: Modification timestamp // 修改时间戳
+        type: integer
+      path:
+        description: File path // 文件路径
+        type: string
+      pathHash:
+        description: Path hash // 路径哈希
+        type: string
+      rename:
+        description: Rename flag // 重命名标记
+        type: integer
+      size:
+        description: File size // 文件大小
+        type: integer
+      updatedAt:
+        description: Updated at time // 更新时间
+        type: string
+    type: object
+  dto.FileRecycleClearRequest:
+    properties:
+      path:
+        description: File path, empty for all // 文件路径，为空则清理全部
+        example: path/to/file.png
+        type: string
+      pathHash:
+        description: Path hash // 路径哈希
+        example: fhash123
+        type: string
+      vault:
+        description: Vault name // 保险库名称
+        example: MyVault
+        type: string
+    required:
+    - vault
+    type: object
+  dto.FileRenameRequest:
+    properties:
+      context:
+        description: Context // 同步上下文
+        example: ctx123
+        type: string
+      oldPath:
+        description: Old path // 旧路径
+        example: OldImage.png
+        type: string
+      oldPathHash:
+        description: Old path hash // 旧路径哈希
+        example: ofhash456
+        type: string
+      path:
+        description: New path // 新路径
+        example: NewImage.png
+        type: string
+      pathHash:
+        description: New path hash // 新路径哈希
+        example: nfhash123
+        type: string
+      vault:
+        description: Vault name // 保险库名称
+        example: MyVault
+        type: string
+    required:
+    - oldPath
+    - path
+    - vault
+    type: object
+  dto.FileRestoreRequest:
+    properties:
+      path:
+        description: File path // 文件路径
+        example: Image.png
+        type: string
+      pathHash:
+        description: Path hash // 路径哈希
+        example: fhash123
+        type: string
+      vault:
+        description: Vault name // 保险库名称
+        example: MyVault
+        type: string
+    required:
+    - path
+    - vault
+    type: object
+  dto.FolderCreateRequest:
+    properties:
+      context:
+        description: Context // 同步上下文
+        example: ctx123
+        type: string
+      path:
+        description: Folder path // 文件夹路径
+        example: NewFolder
+        type: string
+      pathHash:
+        description: Path hash // 路径哈希
+        example: fhash456
+        type: string
+      vault:
+        description: Vault name // 保险库名称
+        example: MyVault
+        type: string
+    required:
+    - path
+    - vault
+    type: object
+  dto.FolderDTO:
+    properties:
+      createdAt:
+        description: Created at time // 创建时间
+        type: string
+      ctime:
+        description: Creation timestamp // 创建时间戳
+        type: integer
+      lastTime:
+        description: Record update timestamp // 记录更新时间戳
+        type: integer
+      mtime:
+        description: Modification timestamp // 修改时间戳
+        type: integer
+      path:
+        description: Folder path // 文件夹路径
+        type: string
+      pathHash:
+        description: Path hash // 路径哈希值
+        type: string
+      updatedAt:
+        description: Updated at time // 更新时间
+        type: string
+    type: object
+  dto.FolderDeleteRequest:
+    properties:
+      context:
+        description: Context // 同步上下文
+        example: ctx123
+        type: string
+      path:
+        description: Folder path // 文件夹路径
+        example: OldFolder
+        type: string
+      pathHash:
+        description: Path hash // 路径哈希
+        example: fhash789
+        type: string
+      vault:
+        description: Vault name // 保险库名称
+        example: MyVault
+        type: string
+    required:
+    - path
+    - vault
+    type: object
+  dto.FolderTreeNode:
+    properties:
+      children:
+        description: Child nodes // 子节点
+        items:
+          $ref: '#/definitions/dto.FolderTreeNode'
+        type: array
+      fileCount:
+        description: File count // 文件数量
+        type: integer
+      name:
+        description: Node name // 节点名称
+        type: string
+      noteCount:
+        description: Note count // 笔记数量
+        type: integer
+      path:
+        description: Node path // 节点路径
+        type: string
+    type: object
+  dto.FolderTreeResponse:
+    properties:
+      folders:
+        description: Folder tree // 文件夹树
+        items:
+          $ref: '#/definitions/dto.FolderTreeNode'
+        type: array
+      rootFileCount:
+        description: File count in root // 根目录中的文件数量
+        type: integer
+      rootNoteCount:
+        description: Note count in root // 根目录中的笔记数量
+        type: integer
+    type: object
+  dto.GitSyncCleanRequest:
+    properties:
+      configId:
+        type: integer
+    type: object
+  dto.GitSyncConfigDTO:
+    properties:
+      branch:
+        description: Branch // 分支
+        type: string
+      configSyncRules:
+        description: Config sync rules // 配置同步规则
+        items:
+          type: string
+        type: array
+      createdAt:
+        description: Created at // 创建时间
+        type: string
+      delay:
+        description: Delay time (seconds) // 延迟时间（秒）
+        type: integer
+      id:
+        description: Task ID // 任务ID
+        type: integer
+      includeConfig:
+        description: Include config sync // 是否开启配置同步
+        type: boolean
+      isEnabled:
+        description: Is enabled // 是否启用
+        type: boolean
+      lastMessage:
+        description: Last run result message // 上次运行结果消息
+        type: string
+      lastStatus:
+        description: Last status (0:Idle, 1:Running, 2:Success, 3:Failed, 4:Shutdown)
+          // 上次状态 (0:Idle, 1:Running, 2:Success, 3:Failed, 4:Shutdown)
+        type: integer
+      lastSyncTime:
+        description: Last sync time // 上次同步时间
+        type: string
+      password:
+        description: Password // 密码
+        type: string
+      repoUrl:
+        description: Repository URL // 仓库地址
+        type: string
+      retentionDays:
+        description: History retention days // 历史记录保留天数
+        type: integer
+      uid:
+        description: User ID // 用户ID
+        type: integer
+      updatedAt:
+        description: Updated at // 更新时间
+        type: string
+      username:
+        description: Username // 用户名
+        type: string
+      vault:
+        description: Associated vault name // 关联库名称
+        type: string
+    type: object
+  dto.GitSyncConfigRequest:
+    properties:
+      branch:
+        type: string
+      configSyncRules:
+        items:
+          type: string
+        type: array
+      delay:
+        description: Delay time (seconds) // 延迟时间（秒）
+        type: integer
+      id:
+        type: integer
+      includeConfig:
+        type: boolean
+      isEnabled:
+        type: boolean
+      password:
+        type: string
+      repoUrl:
+        type: string
+      retentionDays:
+        type: integer
+      username:
+        type: string
+      vault:
+        description: Associated vault name // 关联笔记本名称
+        type: string
+    required:
+    - repoUrl
+    type: object
+  dto.GitSyncDeleteRequest:
+    properties:
+      id:
+        type: integer
+    required:
+    - id
+    type: object
+  dto.GitSyncExecuteRequest:
+    properties:
+      id:
+        type: integer
+    required:
+    - id
+    type: object
+  dto.GitSyncHistoryDTO:
+    properties:
+      configId:
+        type: integer
+      createdAt:
+        type: string
+      endTime:
+        type: string
+      id:
+        type: integer
+      message:
+        type: string
+      startTime:
+        type: string
+      status:
+        description: 0:Idle, 1:Running, 2:Success, 3:Failed, 4:Shutdown
+        type: integer
+    type: object
+  dto.GitSyncValidateRequest:
+    properties:
+      branch:
+        type: string
+      password:
+        type: string
+      repoUrl:
+        type: string
+      username:
+        type: string
+    required:
+    - repoUrl
+    type: object
+  dto.NoteAppendRequest:
+    properties:
+      content:
+        description: Content to append // 追加内容
+        example: Appended content
+        type: string
+      path:
+        description: Note path // 笔记路径
+        example: ReadMe.md
+        type: string
+      pathHash:
+        description: Path hash // 路径哈希
+        example: hash123
+        type: string
+      vault:
+        description: Vault name // 保险库名称
+        example: MyVault
+        type: string
+    required:
+    - content
+    - path
+    - vault
+    type: object
+  dto.NoteDTO:
+    properties:
+      clientName:
+        description: Client name // 客户端名称
+        type: string
+      clientType:
+        description: Client type // 客户端类型
+        type: string
+      clientVersion:
+        description: Client version // 客户端版本
+        type: string
+      content:
+        description: Note content // 笔记内容
+        type: string
+      contentHash:
+        description: Content hash // 内容哈希
+        type: string
+      createdAt:
+        description: Created at time // 创建时间
+        type: string
+      ctime:
+        description: Creation timestamp // 创建时间戳
+        type: integer
+      id:
+        description: Note ID // 笔记 ID
+        type: integer
+      lastTime:
+        description: Record update timestamp // 记录更新时间戳
+        type: integer
+      mtime:
+        description: Modification timestamp // 修改时间戳
+        type: integer
+      path:
+        description: Note path // 笔记路径
+        type: string
+      pathHash:
+        description: Path hash // 路径哈希
+        type: string
+      size:
+        description: Note size // 笔记大小
+        type: integer
+      updatedAt:
+        description: Updated at time // 更新时间
+        type: string
+      version:
+        description: Version number // 版本号
+        type: integer
+    type: object
+  dto.NoteHistoryDTO:
+    properties:
+      clientName:
+        description: Client that made changes // 产生变更的客户端
+        type: string
+      clientType:
+        description: Client type // 客户端类型
+        type: string
+      clientVersion:
+        description: Client version // 客户端版本
+        type: string
+      content:
+        description: Full historical content // 完整历史内容
+        type: string
+      contentHash:
+        description: Content hash // 内容哈希
+        type: string
+      createdAt:
+        description: Creation time of this version // 此版本的创建时间
+        type: string
+      diffs:
+        description: Text differences // 文本差异内容
+        items:
+          type: object
+        type: array
+      id:
+        description: History entry ID // 历史项 ID
+        type: integer
+      noteId:
+        description: Associated note ID // 笔记 ID
+        type: integer
+      path:
+        description: Note path at that time // 当时的笔记路径
+        type: string
+      vaultId:
+        description: Associated vault ID // 保险库 ID
+        type: integer
+      version:
+        description: Historical version number // 历史版本号
+        type: integer
+    type: object
+  dto.NoteHistoryRestoreRequest:
+    properties:
+      historyId:
+        description: History version ID // 历史版本 ID
+        example: 1
+        type: integer
+      vault:
+        description: Vault name // 保险库名称
+        example: MyVault
+        type: string
+    required:
+    - historyId
+    - vault
+    type: object
+  dto.NoteLinkItem:
+    properties:
+      context:
+        description: Text context around link // 链接文本上下文
+        type: string
+      isEmbed:
+        description: Is it an embed (![[...]]) // 是否为嵌入
+        type: boolean
+      linkText:
+        description: Raw link text (optional) // 原始链接文本（可选）
+        type: string
+      path:
+        description: Target path // 目标路径
+        type: string
+    type: object
+  dto.NoteModifyOrCreateRequest:
+    properties:
+      baseHash:
+        description: Base hash for sync // 同步基准哈希
+        example: bhash789
+        type: string
+      baseHashMissing:
+        description: Marks if baseHash is unavailable // 标记基准哈希是否缺失
+        example: false
+        type: boolean
+      content:
+        description: Note content // 笔记内容
+        example: '# Hello World'
+        type: string
+      contentHash:
+        description: Content hash // 内容哈希
+        example: chash012
+        type: string
+      context:
+        description: Context // 同步上下文
+        example: ctx123
+        type: string
+      createOnly:
+        description: If true, fail if note already exists // 如果为 true，笔记已存在则失败
+        example: false
+        type: boolean
+      ctime:
+        description: Creation timestamp // 创建时间戳
+        example: 1700000000
+        type: integer
+      mtime:
+        description: Modification timestamp // 修改时间戳
+        example: 1700000000
+        type: integer
+      path:
+        description: Note path // 笔记路径
+        example: ReadMe.md
+        type: string
+      pathHash:
+        description: Path hash // 路径哈希
+        example: hash123
+        type: string
+      vault:
+        description: Vault name // 保险库名称
+        example: MyVault
+        type: string
+    required:
+    - path
+    - vault
+    type: object
+  dto.NoteNoContentDTO:
+    properties:
+      clientName:
+        description: Client name // 客户端名称
+        type: string
+      clientType:
+        description: Client type // 客户端类型
+        type: string
+      clientVersion:
+        description: Client version // 客户端版本
+        type: string
+      createdAt:
+        description: Created at time // 创建时间
+        type: string
+      ctime:
+        description: Creation timestamp // 创建时间戳
+        type: integer
+      id:
+        description: Note ID // 笔记 ID
+        type: integer
+      lastTime:
+        description: Record update timestamp // 记录更新时间戳
+        type: integer
+      mtime:
+        description: Modification timestamp // 修改时间戳
+        type: integer
+      path:
+        description: Note path // 笔记路径
+        type: string
+      pathHash:
+        description: Path hash // 路径哈希
+        type: string
+      size:
+        description: Note size // 笔记大小
+        type: integer
+      updatedAt:
+        description: Updated at time // 更新时间
+        type: string
+      version:
+        description: Version number // 版本号
+        type: integer
+    type: object
+  dto.NotePatchFrontmatterRequest:
+    properties:
+      path:
+        description: Note path // 笔记路径
+        example: ReadMe.md
+        type: string
+      pathHash:
+        description: Path hash // 路径哈希
+        example: hash123
+        type: string
+      remove:
+        description: Fields to remove // 待移除字段
+        example:
+        - old_tag
+        items:
+          type: string
+        type: array
+      updates:
+        additionalProperties:
+          items:
+            type: string
+          type: array
+        description: Fields to update // 待更新字段
+        type: object
+      vault:
+        description: Vault name // 保险库名称
+        example: MyVault
+        type: string
+    required:
+    - path
+    - vault
+    type: object
+  dto.NotePrependRequest:
+    properties:
+      content:
+        description: Content to prepend // 头部添加内容
+        example: |
+          Prepended content
+        type: string
+      path:
+        description: Note path // 笔记路径
+        example: ReadMe.md
+        type: string
+      pathHash:
+        description: Path hash // 路径哈希
+        example: hash123
+        type: string
+      vault:
+        description: Vault name // 保险库名称
+        example: MyVault
+        type: string
+    required:
+    - content
+    - path
+    - vault
+    type: object
+  dto.NoteRecycleClearRequest:
+    properties:
+      path:
+        description: Note path, empty for all // 笔记路径，为空则清理全部
+        example: path/to/note.md
+        type: string
+      pathHash:
+        description: Path hash // 路径哈希
+        example: hash123
+        type: string
+      vault:
+        description: Vault name // 保险库名称
+        example: MyVault
+        type: string
+    required:
+    - vault
+    type: object
+  dto.NoteRenameRequest:
+    properties:
+      context:
+        description: Context // 同步上下文
+        example: ctx123
+        type: string
+      oldPath:
+        description: Old path // 旧路径
+        example: OldName.md
+        type: string
+      oldPathHash:
+        description: Old path hash // 旧路径哈希
+        example: ohash456
+        type: string
+      path:
+        description: New path // 新路径
+        example: NewName.md
+        type: string
+      pathHash:
+        description: New path hash // 新路径哈希
+        example: nhash123
+        type: string
+      vault:
+        description: Vault name // 保险库名称
+        example: MyVault
+        type: string
+    required:
+    - oldPath
+    - path
+    - vault
+    type: object
+  dto.NoteReplaceRequest:
+    properties:
+      all:
+        description: Replace all matches // 替换所有
+        example: true
+        type: boolean
+      failIfNoMatch:
+        description: Fail if no match found // 若无匹配则失败
+        example: true
+        type: boolean
+      find:
+        description: String to find // 查找内容
+        example: old text
+        type: string
+      path:
+        description: Note path // 笔记路径
+        example: ReadMe.md
+        type: string
+      pathHash:
+        description: Path hash // 路径哈希
+        example: hash123
+        type: string
+      regex:
+        description: Use regex // 使用正则
+        example: false
+        type: boolean
+      replace:
+        description: String to replace with // 替换内容
+        example: new text
+        type: string
+      vault:
+        description: Vault name // 保险库名称
+        example: MyVault
+        type: string
+    required:
+    - find
+    - path
+    - vault
+    type: object
+  dto.NoteReplaceResponse:
+    properties:
+      matchCount:
+        description: Number of matches found // 匹配数量
+        type: integer
+      note:
+        allOf:
+        - $ref: '#/definitions/dto.NoteDTO'
+        description: Updated note data // 更新后的笔记数据
+    type: object
+  dto.NoteRestoreRequest:
+    properties:
+      path:
+        description: Note path // 笔记路径
+        example: ReadMe.md
+        type: string
+      pathHash:
+        description: Path hash // 路径哈希
+        example: hash123
+        type: string
+      vault:
+        description: Vault name // 保险库名称
+        example: MyVault
+        type: string
+    required:
+    - path
+    - vault
+    type: object
+  dto.NoteWithFileLinksResponse:
+    properties:
+      content:
+        description: Note content // 笔记内容
+        type: string
+      contentHash:
+        description: Content hash // 内容哈希
+        type: string
+      createdAt:
+        description: Created at time // 创建时间
+      ctime:
+        description: Creation timestamp // 创建时间戳
+        type: integer
+      fileLinks:
+        additionalProperties:
+          type: string
+        description: Map of file link to actual path // 文件链接到实际路径的映射
+        type: object
+      lastTime:
+        description: Record update timestamp // 记录更新时间戳
+        type: integer
+      mtime:
+        description: Modification timestamp // 修改时间戳
+        type: integer
+      path:
+        description: Note path // 笔记路径
+        type: string
+      pathHash:
+        description: Path hash // 路径哈希
+        type: string
+      updatedAt:
+        description: Updated at time // 更新时间
+      version:
+        description: Version number // 版本号
+        type: integer
+    type: object
+  dto.SettingDTO:
+    properties:
+      content:
+        description: Setting content // 配置内容
+        type: string
+      contentHash:
+        description: Content hash // 内容哈希
+        type: string
+      createdAt:
+        description: Created at time // 创建时间
+        type: string
+      ctime:
+        description: Creation timestamp // 创建时间戳
+        type: integer
+      id:
+        description: Setting ID // 配置 ID
+        type: integer
+      lastTime:
+        description: Record update timestamp // 记录更新时间戳
+        type: integer
+      mtime:
+        description: Modification timestamp // 修改时间戳
+        type: integer
+      path:
+        description: Setting path // 配置路径
+        type: string
+      pathHash:
+        description: Path hash // 路径哈希值
+        type: string
+      updatedAt:
+        description: Updated at time // 更新时间
+        type: string
+    type: object
+  dto.SettingDeleteRequest:
+    properties:
+      context:
+        description: Context // 同步上下文
+        example: ctx123
+        type: string
+      path:
+        description: Setting path // 配置路径
+        example: User/Theme
+        type: string
+      pathHash:
+        description: Path hash // 路径哈希
+        example: hash123
+        type: string
+      vault:
+        description: Vault name // 保险库名称
+        example: MyVault
+        type: string
+    required:
+    - path
+    - vault
+    type: object
+  dto.SettingModifyOrCreateRequest:
+    properties:
+      content:
+        description: Setting content // 配置内容
+        example: dark
+        type: string
+      contentHash:
+        description: Content hash // 内容哈希
+        example: chash456
+        type: string
+      context:
+        description: Context // 同步上下文
+        example: ctx123
+        type: string
+      ctime:
+        description: Creation timestamp // 创建时间戳
+        example: 1700000000
+        type: integer
+      mtime:
+        description: Modification timestamp // 修改时间戳
+        example: 1700000000
+        type: integer
+      path:
+        description: Setting path // 配置路径
+        example: User/Theme
+        type: string
+      pathHash:
+        description: Path hash // 路径哈希
+        example: hash123
+        type: string
+      vault:
+        description: Vault name // 保险库名称
+        example: MyVault
+        type: string
+    required:
+    - path
+    - vault
+    type: object
+  dto.SettingRenameRequest:
+    properties:
+      newPath:
+        description: New path // 新路径
+        example: New/Path
+        type: string
+      newPathHash:
+        description: New path hash // 新路径哈希
+        example: newhash456
+        type: string
+      oldPath:
+        description: Old path // 旧路径
+        example: Old/Path
+        type: string
+      oldPathHash:
+        description: Old path hash // 旧路径哈希
+        example: oldhash123
+        type: string
+      vault:
+        description: Vault name // 保险库名称
+        example: MyVault
+        type: string
+    required:
+    - newPath
+    - oldPath
+    - vault
+    type: object
+  dto.ShareCancelRequest:
+    properties:
+      id:
+        description: Share ID (optional) // 分享 ID (可选)
+        example: 1
+        type: integer
+      path:
+        description: Resource path (optional) // 资源路径 (可选)
+        example: ReadMe.md
+        type: string
+      pathHash:
+        description: Resource path Hash (optional) // 资源路径哈希 (可选)
+        example: hash123
+        type: string
+      vault:
+        description: Vault name // 保险库名称
+        example: defaultVault
+        type: string
+    required:
+    - vault
+    type: object
+  dto.ShareCreateRequest:
+    properties:
+      expireAt:
+        description: Expiration timestamp (unix seconds); 0 or omitted means the share
+          never expires // 过期时间戳（unix 秒）；0 或不传表示永久有效
+        example: 1700000000
+        type: integer
+      password:
+        description: Share password // 分享密码
+        example: "123456"
+        type: string
+      path:
+        description: Resource path // 资源路径
+        example: ReadMe.md
+        type: string
+      pathHash:
+        description: Resource path Hash // 资源路径哈希
+        example: hash123
+        type: string
+      vault:
+        description: Vault name // 保险库名称
+        example: defaultVault
+        type: string
+    required:
+    - path
+    - pathHash
+    - vault
+    type: object
+  dto.ShareCreateResponse:
+    properties:
+      baseUrl:
+        description: Base URL for sharing // 分享基础 URL
+        type: string
+      expiresAt:
+        description: Expiration time // 过期时间
+        type: string
+      id:
+        description: ID of the note or file table (primary resource ID) // 笔记或文件表
+          ID（主资源 ID）
+        type: integer
+      isPassword:
+        description: Whether password is set // 是否设置了密码
+        type: boolean
+      shortLink:
+        description: Short link // 短链
+        type: string
+      token:
+        description: Share Token // 分享 Token
+        type: string
+      type:
+        description: 'Resource type: note or file // 资源类型：笔记（note）或文件（file）'
+        type: string
+    type: object
+  dto.ShareListItem:
+    properties:
+      baseUrl:
+        description: Base URL for sharing // 分享基础 URL
+        type: string
+      createdAt:
+        description: Created at // 创建时间
+        type: string
+      expiresAt:
+        description: Expiration time // 过期时间
+        type: string
+      id:
+        description: Share ID // 分享记录 ID
+        type: integer
+      isPassword:
+        description: Whether password is set // 是否设置了密码
+        type: boolean
+      lastViewedAt:
+        description: Last viewed time // 最后访问时间
+        type: string
+      notePath:
+        description: Note path, for frontend share filter matching // 笔记路径，用于前端分享筛选匹配
+        type: string
+      res:
+        additionalProperties:
+          items:
+            type: string
+          type: array
+        description: Authorized resources // 资源授权列表
+        type: object
+      shortLink:
+        description: Short link // 短链
+        type: string
+      status:
+        description: 'Status: 1-Active, 2-Cancelled // 状态: 1-有效, 2-已撤销'
+        type: integer
+      title:
+        description: Resource title (note title or file name) // 资源标题（笔记标题或文件名）
+        type: string
+      uid:
+        description: User ID // 用户 ID
+        type: integer
+      updatedAt:
+        description: Updated at // 更新时间
+        type: string
+      url:
+        description: 'Share URL (path format: /id/token) // 分享 URL (路径格式: /id/token)'
+        type: string
+      vaultName:
+        description: Vault name where the note belongs // 笔记所属仓库名
+        type: string
+      viewCount:
+        description: View count // 访问次数
+        type: integer
+    type: object
+  dto.SharePasswordUpdateRequest:
+    properties:
+      expireAt:
+        description: Expiration timestamp (unix seconds); 0 or omitted means the share
+          never expires // 过期时间戳（unix 秒）；0 或不传表示永久有效
+        example: 1700000000
+        type: integer
+      password:
+        description: New password // 新密码
+        example: "123456"
+        type: string
+      path:
+        description: Resource path // 资源路径
+        example: 未命名.md
+        type: string
+      pathHash:
+        description: Resource path Hash // 资源路径哈希
+        example: "-677306325"
+        type: string
+      vault:
+        description: Vault name // 保险库名称
+        example: test
+        type: string
+    required:
+    - path
+    - pathHash
+    - vault
+    type: object
+  dto.ShareShortLinkCreateRequest:
+    properties:
+      is_force:
+        description: Whether to force regeneration // 是否强制重新生成
+        example: false
+        type: boolean
+      path:
+        description: Path // 路径
+        example: notes/todo.md
+        type: string
+      pathHash:
+        description: Path hash // 路径哈希
+        example: '...'
+        type: string
+      url:
+        description: Full share URL from client; if provided, used directly without
+          regenerating token // 客户端传入的完整分享链接，非空时直接使用，不重新生成 token
+        example: https://example.com/share/129/CNmkmQlq0s-4elT3NuZG2w
+        type: string
+      vault:
+        description: Vault name // 库名
+        example: work
+        type: string
+    required:
+    - path
+    - pathHash
+    - vault
+    type: object
+  dto.SourceProbeDTO:
+    description: Probe result containing GitHub/CNB reachability, latency, recommended
+      source and current mode
+    properties:
+      cnb:
+        allOf:
+        - $ref: '#/definitions/dto.SourceProbeItem'
+        description: CNB probe result // CNB 探测结果
+      github:
+        allOf:
+        - $ref: '#/definitions/dto.SourceProbeItem'
+        description: GitHub probe result // GitHub 探测结果
+      recommended:
+        description: 'Recommended source: "github" or "cnb" // 推荐源'
+        example: github
+        type: string
+      selectedMode:
+        description: Current configured pull-source mode // 当前配置的选源模式
+        example: auto
+        type: string
+    type: object
+  dto.SourceProbeItem:
+    description: 'Single source probe result: reachability and latency'
+    properties:
+      latencyMs:
+        description: Round-trip latency in ms // 往返延迟（毫秒）
+        example: 280
+        type: integer
+      ok:
+        description: Whether the source is reachable // 该源是否可达
+        example: true
+        type: boolean
+    type: object
+  dto.StorageDTO:
+    properties:
+      accessKeyId:
+        description: Access key ID // 访问密钥 ID
+        type: string
+      accessKeySecret:
+        description: Access key secret // 访问密钥秘密
+        type: string
+      accessUrlPrefix:
+        description: Access URL prefix // 访问地址前缀
+        type: string
+      accountId:
+        description: Account ID // 账户 ID
+        type: string
+      bucketName:
+        description: Bucket name // 存储桶名称
+        type: string
+      createdAt:
+        description: Created at // 创建时间
+        type: string
+      customPath:
+        description: Custom path // 自定义路径
+        type: string
+      endpoint:
+        description: Endpoint // 访问端点
+        type: string
+      id:
+        description: ID // ID
+        type: integer
+      isEnabled:
+        description: Is enabled // 是否启用
+        type: boolean
+      password:
+        description: Password // 密码
+        type: string
+      region:
+        description: Region // 区域
+        type: string
+      type:
+        description: Storage type // 存储类型
+        type: string
+      updatedAt:
+        description: Updated at // 更新时间
+        type: string
+      user:
+        description: Username // 用户名
+        type: string
+    type: object
+  dto.StoragePostRequest:
+    properties:
+      accessKeyId:
+        description: Access key ID // 访问密钥ID
+        example: ""
+        type: string
+      accessKeySecret:
+        description: Access key secret // 访问密钥秘密
+        example: ""
+        type: string
+      accessUrlPrefix:
+        description: Access URL prefix // 访问地址前缀
+        example: https://cdn.com
+        maxLength: 100
+        minLength: 2
+        type: string
+      accountId:
+        description: Account ID (R2) // 账户ID r2
+        example: "123456789"
+        type: string
+      bucketName:
+        description: Bucket name // 存储桶名称
+        example: my-bucket
+        type: string
+      customPath:
+        description: Custom path // 自定义路径
+        example: /backups
+        type: string
+      endpoint:
+        description: Endpoint (OSS) // 端点 oss
+        example: oss-cn-hangzhou.aliyuncs.com
+        type: string
+      id:
+        description: ID // ID
+        example: 1
+        type: integer
+      isEnabled:
+        description: Is enabled // 是否启用
+        example: 1
+        type: integer
+      password:
+        description: Password // 密码
+        example: secret_password
+        type: string
+      region:
+        description: Region (S3) // 区域 s3
+        example: us-east-1
+        type: string
+      type:
+        description: Storage type // 类型
+        example: local-fs
+        minLength: 1
+        type: string
+      user:
+        description: Username // 访问用户名
+        example: admin
+        type: string
+    required:
+    - accessUrlPrefix
+    - type
+    type: object
+  dto.SyncLogDTO:
+    properties:
+      action:
+        description: Action type // 操作类型
+        type: string
+      changedFields:
+        description: Changed fields // 变更字段
+        type: string
+      clientName:
+        description: Client name // 客户端名称
+        type: string
+      clientType:
+        description: Client type // 客户端类型
+        type: string
+      clientVersion:
+        description: Client version // 客户端版本
+        type: string
+      createdAt:
+        description: Log creation time // 创建时间
+        type: string
+      message:
+        description: Additional message // 附加消息
+        type: string
+      path:
+        description: Resource path // 资源路径
+        type: string
+      pathHash:
+        description: Resource path hash // 路径哈希
+        type: string
+      size:
+        description: Size in bytes // 大小（字节）
+        type: integer
+      status:
+        description: 'Status: 1 success, 2 failed // 状态'
+        type: integer
+      type:
+        description: Resource type // 资源类型
+        type: string
+      vaultId:
+        description: Vault ID // 笔记本 ID
+        type: integer
+    type: object
+  dto.UserChangePasswordRequest:
+    properties:
+      confirmPassword:
+        description: Confirm password // 校验密码
+        example: new_password123
+        type: string
+      oldPassword:
+        description: Old password // 旧密码
+        example: old_password123
+        type: string
+      password:
+        description: New password // 新密码
+        example: new_password123
+        type: string
+    required:
+    - confirmPassword
+    - oldPassword
+    - password
+    type: object
+  dto.UserCreateRequest:
+    properties:
+      confirmPassword:
+        description: Confirm password // 校验密码
+        example: password123
+        type: string
+      email:
+        description: User email // 用户邮件
+        example: user@example.com
+        type: string
+      password:
+        description: User password // 用户密码
+        example: password123
+        type: string
+      username:
+        description: User name // 用户名
+        example: username123
+        type: string
+    required:
+    - confirmPassword
+    - email
+    - password
+    - username
+    type: object
+  dto.UserDTO:
+    properties:
+      avatar:
+        description: Avatar URL or handle // 头像路径或名称
+        type: string
+      createdAt:
+        description: Account created time // 账号创建时间
+        type: string
+      email:
+        description: Email address // 邮件地址
+        type: string
+      isDeleted:
+        description: User is blocked
+        type: boolean
+      token:
+        description: Authentication Token // 认证 Token
+        type: string
+      tokenId:
+        description: Authentication Token ID // 认证 Token ID
+        type: integer
+      uid:
+        description: User ID (primary key) // 用户唯一标识（主键）
+        type: integer
+      updatedAt:
+        description: Last updated time // 最后更新时间
+        type: string
+      username:
+        description: Username // 用户名
+        type: string
+    type: object
+  dto.UserLoginRequest:
+    properties:
+      credentials:
+        description: Username or Email // 登录凭证（用户名或邮件）
+        example: user@example.com
+        type: string
+      password:
+        description: Password // 密码
+        example: password123
+        type: string
+      tokenId:
+        description: Last token ID for rotation // 最后一个用于轮转的令牌ID
+        example: 123
+        type: integer
+    required:
+    - credentials
+    - password
+    type: object
+  dto.UserUpdateRequest:
+    properties:
+      email:
+        description: User email // 用户邮件
+        example: user@example.com
+        type: string
+      isDeleted:
+        description: User deleted flag
+        example: true
+        type: boolean
+      password:
+        description: User password // 用户密码
+        example: password123
+        type: string
+      uid:
+        description: User ID (primary key) // 用户唯一标识（主键）
+        example: 123
+        type: integer
+      username:
+        description: User name // 用户名
+        example: username123
+        type: string
+    required:
+    - email
+    - uid
+    - username
+    type: object
+  dto.VaultDTO:
+    properties:
+      createdAt:
+        description: Creation time // 创建时间
+        type: string
+      fileCount:
+        description: Number of files // 文件数量
+        type: integer
+      fileSize:
+        description: Size of files // 文件大小
+        type: integer
+      id:
+        description: Vault ID // 保险库 ID
+        type: integer
+      noteCount:
+        description: Number of notes // 笔记数量
+        type: integer
+      noteSize:
+        description: Size of notes // 笔记大小
+        type: integer
+      size:
+        description: Total size // 总大小
+        type: integer
+      updatedAt:
+        description: Updated time // 更新时间
+        type: string
+      vault:
+        description: Vault name // 保险库名称
+        type: string
+    type: object
+  dto.VaultForceDeleteItemRequest:
+    properties:
+      id:
+        description: Resource ID // 资源 ID
+        example: 100
+        type: integer
+      type:
+        description: 'Resource type: note or file // 资源类型'
+        type: string
+      vaultId:
+        description: Vault ID // 笔记库 ID
+        example: 1
+        type: integer
+    required:
+    - id
+    - type
+    - vaultId
+    type: object
+  dto.VaultPostRequest:
+    properties:
+      id:
+        description: Vault ID (optional for update) // 保险库 ID（可选，用于更新）
+        example: 1
+        type: integer
+      vault:
+        description: Vault name // 保险库名称
+        example: MyVault
+        type: string
+    required:
+    - vault
+    type: object
+  dto.VaultRebuildIndexRequest:
+    properties:
+      id:
+        description: Vault ID // 保险库 ID
+        example: 1
+        minimum: 1
+        type: integer
+    required:
+    - id
+    type: object
+  dto.VersionDTO:
+    properties:
+      buildTime:
+        description: Build time // 构建时间
+        type: string
+      gitTag:
+        description: Git tag // Git 标签
+        type: string
+      pluginVersionHistory:
+        description: Plugin version history // 插件历史版本
+        items:
+          $ref: '#/definitions/app.HistoricalVersion'
+        type: array
+      pluginVersionNewChangelog:
+        description: New plugin version changelog link // 插件新版本更新日志链接
+        type: string
+      pluginVersionNewChangelogContent:
+        description: New plugin version changelog content // 插件新版本更新日志内容
+        type: string
+      pluginVersionNewLink:
+        description: New plugin version link // 插件新版本链接
+        type: string
+      pluginVersionNewName:
+        description: New plugin version name // 插件新版本名称
+        type: string
+      version:
+        description: Current version // 当前版本
+        type: string
+      versionHistory:
+        description: Service version history // 服务端历史版本
+        items:
+          $ref: '#/definitions/app.HistoricalVersion'
+        type: array
+      versionIsNew:
+        description: Is there a new version // 是否有新版本
+        type: boolean
+      versionNewChangelog:
+        description: New version changelog link // 新版本更新日志链接
+        type: string
+      versionNewChangelogContent:
+        description: New version changelog content // 新版本更新日志内容
+        type: string
+      versionNewLink:
+        description: New version download link // 新版本下载链接
+        type: string
+      versionNewName:
+        description: New version name // 新版本名称
+        type: string
+    type: object
+host: localhost:9000
+info:
+  contact:
+    email: haierkeys@gmail.com
+    name: Haierkeys
+    url: https://github.com/haierkeys
+  description: This is the Fast Note Sync Service HTTP API.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  title: Fast Note Sync Service HTTP API
+  version: "1.0"
+paths:
+  /api/admin/check:
+    get:
+      description: Check if the current logged-in user has system admin privileges
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.AdminCheckResponse'
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Check admin permission
+      tags:
+      - Config
+  /api/admin/cloudflared_tunnel_download:
+    get:
+      description: Trigger the download of cloudflared binary for the current platform
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Download cloudflared binary
+      tags:
+      - System
+  /api/admin/config:
+    get:
+      description: Get full system configuration information, requires admin privileges
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.AdminConfig'
+              type: object
+        "403":
+          description: Insufficient privileges
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Get full admin config
+      tags:
+      - Config
+    post:
+      consumes:
+      - application/json
+      description: Modify full system configuration information, requires admin privileges
+      parameters:
+      - description: Config Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.AdminConfig'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.AdminConfig'
+              type: object
+        "403":
+          description: Insufficient privileges
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Update admin config
+      tags:
+      - Config
+  /api/admin/config/cloudflare:
+    get:
+      description: Get Cloudflare tunnel configuration, requires admin privileges
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.AdminCloudflareConfig'
+              type: object
+        "403":
+          description: Insufficient privileges
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Get Cloudflare config
+      tags:
+      - Config
+    post:
+      consumes:
+      - application/json
+      description: Modify Cloudflare tunnel configuration, requires admin privileges
+      parameters:
+      - description: Config Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.AdminCloudflareConfig'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.AdminCloudflareConfig'
+              type: object
+        "403":
+          description: Insufficient privileges
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Update Cloudflare config
+      tags:
+      - Config
+  /api/admin/config/user_database:
+    get:
+      description: Get user database configuration information, requires admin privileges
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.AdminUserDatabaseConfig'
+              type: object
+        "403":
+          description: Insufficient privileges
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Get user database config
+      tags:
+      - Config
+    post:
+      consumes:
+      - application/json
+      description: Modify user database configuration information, requires admin
+        privileges
+      parameters:
+      - description: Config Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.AdminUserDatabaseConfig'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.AdminUserDatabaseConfig'
+              type: object
+        "403":
+          description: Insufficient privileges
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Update user database config
+      tags:
+      - Config
+  /api/admin/config/user_database/test:
+    post:
+      consumes:
+      - application/json
+      description: Test if the provided database configuration can connect successfully,
+        requires admin privileges
+      parameters:
+      - description: Config Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.AdminUserDatabaseConfig'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            $ref: '#/definitions/app.Res'
+        "400":
+          description: Connection failed
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Test user database connection
+      tags:
+      - Config
+  /api/admin/gc:
+    get:
+      description: Manually run Go runtime GC and release memory to OS, requires admin
+        privileges
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            $ref: '#/definitions/app.Res'
+        "403":
+          description: Insufficient privileges
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Trigger manual GC
+      tags:
+      - System
+  /api/admin/restart:
+    get:
+      description: Gracefully restart the server
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Trigger server restart
+      tags:
+      - System
+  /api/admin/system/info:
+    get:
+      description: Get server runtime, CPU, memory, host and process info, requires
+        admin privileges
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.AdminSystemInfo'
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Get system stats
+      tags:
+      - System
+  /api/admin/upgrade:
+    get:
+      description: Download latest version and restart server
+      parameters:
+      - description: Version to upgrade (e.g. 2.0.10 or latest)
+        in: query
+        name: version
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Trigger server upgrade
+      tags:
+      - System
+  /api/admin/users/create:
+    post:
+      consumes:
+      - application/json
+      description: Create a new user, requires admin privileges
+      parameters:
+      - description: Config Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UserCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.UserDTO'
+              type: object
+        "403":
+          description: Insufficient privileges
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Create a new user
+      tags:
+      - Config
+  /api/admin/users/list:
+    get:
+      description: Handle request to get all users.
+      parameters:
+      - description: Page number // 页码
+        in: query
+        name: page
+        type: integer
+      - description: Page size // 每页数量
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/app.ListRes'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/dto.UserDTO'
+                        type: array
+                    type: object
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Get all users
+      tags:
+      - Config
+  /api/admin/users/update:
+    post:
+      consumes:
+      - application/json
+      description: Update a user, requires admin privileges
+      parameters:
+      - description: Config Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UserUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.UserDTO'
+              type: object
+        "403":
+          description: Insufficient privileges
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Update a user
+      tags:
+      - Config
+  /api/admin/ws_client/{traceId}:
+    delete:
+      description: Kick a WebSocket client by TraceID, requires admin privileges
+      parameters:
+      - description: Trace ID of the client
+        in: path
+        name: traceId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            $ref: '#/definitions/app.Res'
+        "403":
+          description: Insufficient privileges
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Kick a WebSocket client
+      tags:
+      - System
+  /api/admin/ws_clients:
+    get:
+      description: Get a list of all current WebSocket connections, requires admin
+        privileges
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/app.WSClientInfo'
+                  type: array
+              type: object
+        "403":
+          description: Insufficient privileges
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Get connected WebSocket clients
+      tags:
+      - System
+  /api/auth/logout:
+    post:
+      description: |-
+        Handle user logout HTTP request, revoke current auth token.
+        处理用户退出登录 HTTP 请求，注销当前认证 Token。
+      responses:
+        "200":
+          description: Success
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: User logout
+      tags:
+      - User
+  /api/backup/config:
+    delete:
+      parameters:
+      - description: ID // ID
+        example: 1
+        in: query
+        name: id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            $ref: '#/definitions/app.Res'
+        "400":
+          description: Invalid Params
+          schema:
+            $ref: '#/definitions/app.Res'
+        "401":
+          description: Token Required
+          schema:
+            $ref: '#/definitions/app.Res'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Delete backup configuration
+      tags:
+      - Backup
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Backup Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.BackupConfigRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.BackupConfigDTO'
+              type: object
+        "400":
+          description: Invalid Params
+          schema:
+            $ref: '#/definitions/app.Res'
+        "401":
+          description: Token Required
+          schema:
+            $ref: '#/definitions/app.Res'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Update backup configuration
+      tags:
+      - Backup
+  /api/backup/configs:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/dto.BackupConfigDTO'
+                  type: array
+              type: object
+        "401":
+          description: Token Required
+          schema:
+            $ref: '#/definitions/app.Res'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Get backup configurations
+      tags:
+      - Backup
+  /api/backup/execute:
+    post:
+      parameters:
+      - description: Backup Execute Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.BackupExecuteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            $ref: '#/definitions/app.Res'
+        "400":
+          description: Invalid Params
+          schema:
+            $ref: '#/definitions/app.Res'
+        "401":
+          description: Token Required
+          schema:
+            $ref: '#/definitions/app.Res'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Trigger a backup manually
+      tags:
+      - Backup
+  /api/backup/historys:
+    get:
+      parameters:
+      - description: Config ID // 配置 ID
+        example: 1
+        in: query
+        name: configId
+        required: true
+        type: integer
+      - description: Page number // 页码
+        example: 1
+        in: query
+        name: page
+        type: integer
+      - description: Page size // 每页大小
+        example: 10
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/app.ListRes'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/dto.BackupHistoryDTO'
+                        type: array
+                    type: object
+              type: object
+        "400":
+          description: Invalid Params
+          schema:
+            $ref: '#/definitions/app.Res'
+        "401":
+          description: Token Required
+          schema:
+            $ref: '#/definitions/app.Res'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Get backup history list
+      tags:
+      - Backup
+  /api/file:
+    delete:
+      description: Permanently delete a specific attachment record and its physical
+        file
+      parameters:
+      - description: Context // 同步上下文
+        example: ctx123
+        in: query
+        name: context
+        type: string
+      - description: File path // 文件路径
+        example: Image.png
+        in: query
+        name: path
+        required: true
+        type: string
+      - description: Path hash // 路径哈希
+        example: fhash123
+        in: query
+        name: pathHash
+        required: true
+        type: string
+      - description: Vault name // 保险库名称
+        example: MyVault
+        in: query
+        name: vault
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.FileDTO'
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Delete attachment
+      tags:
+      - File
+    get:
+      description: Get raw binary data of an attachment by path, supports strong cache
+        control
+      parameters:
+      - description: Context // 同步上下文
+        example: ctx123
+        in: query
+        name: context
+        type: string
+      - description: Is in recycle bin // 是否在回收站
+        example: false
+        in: query
+        name: isRecycle
+        type: boolean
+      - description: File path // 文件路径
+        example: Image.png
+        in: query
+        name: path
+        required: true
+        type: string
+      - description: Path hash // 路径哈希
+        example: fhash123
+        in: query
+        name: pathHash
+        type: string
+      - description: Vault name // 保险库名称
+        example: MyVault
+        in: query
+        name: vault
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: Success
+          schema:
+            type: file
+      security:
+      - UserAuthToken: []
+      summary: Get attachment content
+      tags:
+      - File
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload a file as an attachment
+      parameters:
+      - description: Vault name
+        in: formData
+        name: vault
+        required: true
+        type: string
+      - description: File path
+        in: formData
+        name: path
+        required: true
+        type: string
+      - description: Creation timestamp
+        format: int64
+        in: formData
+        name: ctime
+        type: integer
+      - description: Modification timestamp
+        format: int64
+        in: formData
+        name: mtime
+        type: integer
+      - description: File to upload
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.FileDTO'
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Upload attachment
+      tags:
+      - File
+  /api/file/info:
+    get:
+      description: Get attachment metadata (FileDTO) by path
+      parameters:
+      - description: Context // 同步上下文
+        example: ctx123
+        in: query
+        name: context
+        type: string
+      - description: Is in recycle bin // 是否在回收站
+        example: false
+        in: query
+        name: isRecycle
+        type: boolean
+      - description: File path // 文件路径
+        example: Image.png
+        in: query
+        name: path
+        required: true
+        type: string
+      - description: Path hash // 路径哈希
+        example: fhash123
+        in: query
+        name: pathHash
+        type: string
+      - description: Vault name // 保险库名称
+        example: MyVault
+        in: query
+        name: vault
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.FileDTO'
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Get attachment info
+      tags:
+      - File
+  /api/file/recycle-clear:
+    delete:
+      consumes:
+      - application/json
+      description: Permanently clear selected files from recycle bin
+      parameters:
+      - description: Clear Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.FileRecycleClearRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Clear recycle bin
+      tags:
+      - File
+  /api/file/rename:
+    post:
+      consumes:
+      - application/json
+      description: Rename an attachment to a new path
+      parameters:
+      - description: Rename Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.FileRenameRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.FileDTO'
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Rename attachment
+      tags:
+      - File
+  /api/file/restore:
+    put:
+      description: Restore deleted attachment from trash
+      parameters:
+      - description: Restore Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.FileRestoreRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.FileDTO'
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Restore attachment
+      tags:
+      - File
+  /api/files:
+    get:
+      description: Get attachment list for current user with pagination, search, filter,
+        and sort support
+      parameters:
+      - description: Is in recycle bin // 是否在回收站
+        example: false
+        in: query
+        name: isRecycle
+        type: boolean
+      - description: Search keyword // 搜索关键词
+        example: vacation
+        in: query
+        name: keyword
+        type: string
+      - description: Sort by field // 排序字段
+        example: mtime
+        in: query
+        name: sortBy
+        type: string
+      - description: Sort order // 排序顺序
+        example: desc
+        in: query
+        name: sortOrder
+        type: string
+      - description: Vault name // 保险库名称
+        example: MyVault
+        in: query
+        name: vault
+        required: true
+        type: string
+      - description: Page number // 页码
+        in: query
+        name: page
+        type: integer
+      - description: Page size // 每页数量
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/app.ListRes'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/dto.FileDTO'
+                        type: array
+                    type: object
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Get file list
+      tags:
+      - File
+  /api/folder:
+    delete:
+      consumes:
+      - application/json
+      description: Soft delete a folder by path or pathHash
+      parameters:
+      - description: Delete Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.FolderDeleteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Delete folder
+      tags:
+      - Folder
+    get:
+      description: Get folder info for current user by path or pathHash
+      parameters:
+      - description: Folder path // 文件夹路径
+        example: Projects/Work
+        in: query
+        name: path
+        type: string
+      - description: Path hash // 路径哈希
+        example: fhash123
+        in: query
+        name: pathHash
+        type: string
+      - description: Vault name // 保险库名称
+        example: MyVault
+        in: query
+        name: vault
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.FolderDTO'
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Get folder info
+      tags:
+      - Folder
+    post:
+      consumes:
+      - application/json
+      description: Create a new folder or restore a deleted one by path
+      parameters:
+      - description: Create Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.FolderCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.FolderDTO'
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Create folder
+      tags:
+      - Folder
+  /api/folder/files:
+    get:
+      description: List non-deleted files in a specific folder with pagination and
+        sorting
+      parameters:
+      - description: Folder path // 文件夹路径
+        example: Projects
+        in: query
+        name: path
+        type: string
+      - description: Path hash // 路径哈希
+        example: fhash123
+        in: query
+        name: pathHash
+        type: string
+      - description: Sort by field // 排序字段
+        example: mtime
+        in: query
+        name: sortBy
+        type: string
+      - description: Sort order // 排序顺序
+        example: desc
+        in: query
+        name: sortOrder
+        type: string
+      - description: Vault name // 保险库名称
+        example: MyVault
+        in: query
+        name: vault
+        required: true
+        type: string
+      - description: Page number // 页码
+        in: query
+        name: page
+        type: integer
+      - description: Page size // 每页数量
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/app.ListRes'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/dto.FileDTO'
+                        type: array
+                    type: object
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: List files in folder
+      tags:
+      - Folder
+  /api/folder/notes:
+    get:
+      description: List non-deleted notes in a specific folder with pagination and
+        sorting
+      parameters:
+      - description: Folder path // 文件夹路径
+        example: Projects
+        in: query
+        name: path
+        type: string
+      - description: Path hash // 路径哈希
+        example: fhash123
+        in: query
+        name: pathHash
+        type: string
+      - description: Sort by field // 排序字段
+        example: mtime
+        in: query
+        name: sortBy
+        type: string
+      - description: Sort order // 排序顺序
+        example: desc
+        in: query
+        name: sortOrder
+        type: string
+      - description: Vault name // 保险库名称
+        example: MyVault
+        in: query
+        name: vault
+        required: true
+        type: string
+      - description: Page number // 页码
+        in: query
+        name: page
+        type: integer
+      - description: Page size // 每页数量
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/app.ListRes'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/dto.NoteDTO'
+                        type: array
+                    type: object
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: List notes in folder
+      tags:
+      - Folder
+  /api/folder/tree:
+    get:
+      description: Get the complete folder tree structure for a vault
+      parameters:
+      - description: Tree depth // 树深度
+        example: 3
+        in: query
+        name: depth
+        type: integer
+      - description: Vault name // 保险库名称
+        example: MyVault
+        in: query
+        name: vault
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.FolderTreeResponse'
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Get folder tree
+      tags:
+      - Folder
+  /api/folders:
+    get:
+      description: Get folder list for current user by parent path or pathHash
+      parameters:
+      - description: Folder path // 文件夹路径
+        example: Projects
+        in: query
+        name: path
+        type: string
+      - description: Path hash // 路径哈希
+        example: fhash123
+        in: query
+        name: pathHash
+        type: string
+      - description: Vault name // 保险库名称
+        example: MyVault
+        in: query
+        name: vault
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/dto.FolderDTO'
+                  type: array
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Get folder list
+      tags:
+      - Folder
+  /api/git-sync/config:
+    delete:
+      parameters:
+      - description: Git Sync ID
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.GitSyncDeleteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            $ref: '#/definitions/app.Res'
+        "400":
+          description: Invalid Params
+          schema:
+            $ref: '#/definitions/app.Res'
+        "401":
+          description: Token Required
+          schema:
+            $ref: '#/definitions/app.Res'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Delete git sync configuration
+      tags:
+      - GitSync
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Git Sync Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.GitSyncConfigRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.GitSyncConfigDTO'
+              type: object
+        "400":
+          description: Invalid Params
+          schema:
+            $ref: '#/definitions/app.Res'
+        "401":
+          description: Token Required
+          schema:
+            $ref: '#/definitions/app.Res'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Update git sync configuration
+      tags:
+      - GitSync
+  /api/git-sync/config/clean:
+    delete:
+      consumes:
+      - application/json
+      parameters:
+      - description: Clean Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.GitSyncCleanRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            $ref: '#/definitions/app.Res'
+        "400":
+          description: Invalid Params
+          schema:
+            $ref: '#/definitions/app.Res'
+        "401":
+          description: Token Required
+          schema:
+            $ref: '#/definitions/app.Res'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Clean local git workspace
+      tags:
+      - GitSync
+  /api/git-sync/config/execute:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Execute Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.GitSyncExecuteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            $ref: '#/definitions/app.Res'
+        "400":
+          description: Invalid Params
+          schema:
+            $ref: '#/definitions/app.Res'
+        "401":
+          description: Token Required
+          schema:
+            $ref: '#/definitions/app.Res'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Trigger a manual git sync
+      tags:
+      - GitSync
+  /api/git-sync/configs:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/dto.GitSyncConfigDTO'
+                  type: array
+              type: object
+        "401":
+          description: Token Required
+          schema:
+            $ref: '#/definitions/app.Res'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Get git sync configurations
+      tags:
+      - GitSync
+  /api/git-sync/histories:
+    get:
+      parameters:
+      - in: query
+        name: configId
+        type: integer
+      - in: query
+        name: page
+        type: integer
+      - in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/app.ListRes'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/dto.GitSyncHistoryDTO'
+                        type: array
+                    type: object
+              type: object
+        "401":
+          description: Token Required
+          schema:
+            $ref: '#/definitions/app.Res'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Get git sync histories
+      tags:
+      - GitSync
+  /api/git-sync/validate:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Validation Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.GitSyncValidateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            $ref: '#/definitions/app.Res'
+        "400":
+          description: Invalid Params
+          schema:
+            $ref: '#/definitions/app.Res'
+        "401":
+          description: Token Required
+          schema:
+            $ref: '#/definitions/app.Res'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Validate git sync parameters
+      tags:
+      - GitSync
+  /api/health:
+    get:
+      description: Check service health status, including database connection
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api_router.HealthResponse'
+      summary: Health check
+      tags:
+      - System
+  /api/note:
+    delete:
+      description: Move note to trash
+      parameters:
+      - description: Context // 同步上下文
+        example: ctx123
+        in: query
+        name: context
+        type: string
+      - description: Note path // 笔记路径
+        example: ReadMe.md
+        in: query
+        name: path
+        required: true
+        type: string
+      - description: Path hash // 路径哈希
+        example: hash123
+        in: query
+        name: pathHash
+        type: string
+      - description: Vault name // 保险库名称
+        example: MyVault
+        in: query
+        name: vault
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.NoteDTO'
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Delete note
+      tags:
+      - Note
+    get:
+      description: Get specific note content and metadata by path or path hash
+      parameters:
+      - description: Is in recycle bin // 是否在回收站
+        example: false
+        in: query
+        name: isRecycle
+        type: boolean
+      - description: Note path // 笔记路径
+        example: ReadMe.md
+        in: query
+        name: path
+        required: true
+        type: string
+      - description: Path hash // 路径哈希
+        example: hash123
+        in: query
+        name: pathHash
+        type: string
+      - description: Vault name // 保险库名称
+        example: MyVault
+        in: query
+        name: vault
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.NoteWithFileLinksResponse'
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Get note details
+      tags:
+      - Note
+    post:
+      consumes:
+      - application/json
+      description: Handle note creation, modification, or renaming (identified by
+        path change)
+      parameters:
+      - description: Note Content
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.NoteModifyOrCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.NoteDTO'
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Create or update note
+      tags:
+      - Note
+  /api/note/append:
+    post:
+      consumes:
+      - application/json
+      description: Append content to the end of a note
+      parameters:
+      - description: Append Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.NoteAppendRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.NoteDTO'
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Append content to note
+      tags:
+      - Note
+  /api/note/backlinks:
+    get:
+      description: Get all other notes that link to the specified note
+      parameters:
+      - description: Note path // 笔记路径
+        example: ReadMe.md
+        in: query
+        name: path
+        required: true
+        type: string
+      - description: Path hash // 路径哈希
+        example: hash123
+        in: query
+        name: pathHash
+        type: string
+      - description: Vault name // 保险库名称
+        example: MyVault
+        in: query
+        name: vault
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/dto.NoteLinkItem'
+                  type: array
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Get backlinks
+      tags:
+      - Note
+  /api/note/frontmatter:
+    patch:
+      consumes:
+      - application/json
+      description: Update or delete note frontmatter fields
+      parameters:
+      - description: Frontmatter Modification Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.NotePatchFrontmatterRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.NoteDTO'
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Modify note frontmatter
+      tags:
+      - Note
+  /api/note/histories:
+    get:
+      description: Get all history records for a specific note with pagination
+      parameters:
+      - description: Is in recycle bin // 是否在回收站
+        example: false
+        in: query
+        name: isRecycle
+        type: boolean
+      - description: Note path // 笔记路径
+        example: ReadMe.md
+        in: query
+        name: path
+        required: true
+        type: string
+      - description: Path hash // 路径哈希
+        example: hash123
+        in: query
+        name: pathHash
+        type: string
+      - description: Vault name // 保险库名称
+        example: MyVault
+        in: query
+        name: vault
+        required: true
+        type: string
+      - description: Page number // 页码
+        in: query
+        name: page
+        type: integer
+      - description: Page size // 每页数量
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/app.ListRes'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/dto.NoteHistoryDTO'
+                        type: array
+                    type: object
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Get note history list
+      tags:
+      - Note History
+  /api/note/history:
+    get:
+      description: Get specific note history content by history record ID
+      parameters:
+      - description: History Record ID
+        format: int64
+        in: query
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.NoteHistoryDTO'
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Get note history details
+      tags:
+      - Note History
+  /api/note/history/restore:
+    put:
+      consumes:
+      - application/json
+      description: Restore note content to a specific history version
+      parameters:
+      - description: Restore Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.NoteHistoryRestoreRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.NoteDTO'
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Restore note from history
+      tags:
+      - Note History
+  /api/note/outlinks:
+    get:
+      description: Get other notes that the specified note links to
+      parameters:
+      - description: Note path // 笔记路径
+        example: ReadMe.md
+        in: query
+        name: path
+        required: true
+        type: string
+      - description: Path hash // 路径哈希
+        example: hash123
+        in: query
+        name: pathHash
+        type: string
+      - description: Vault name // 保险库名称
+        example: MyVault
+        in: query
+        name: vault
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/dto.NoteLinkItem'
+                  type: array
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Get outgoing links
+      tags:
+      - Note
+  /api/note/prepend:
+    post:
+      consumes:
+      - application/json
+      description: Insert content at the beginning of a note (after frontmatter)
+      parameters:
+      - description: Prepend Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.NotePrependRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.NoteDTO'
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Prepend content to note
+      tags:
+      - Note
+  /api/note/recycle-clear:
+    delete:
+      consumes:
+      - application/json
+      description: Permanently clear selected notes from recycle bin
+      parameters:
+      - description: Clear Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.NoteRecycleClearRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Clear recycle bin
+      tags:
+      - Note
+  /api/note/rename:
+    post:
+      consumes:
+      - application/json
+      description: Rename a note to a new path
+      parameters:
+      - description: Rename Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.NoteRenameRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.NoteDTO'
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Rename note
+      tags:
+      - Note
+  /api/note/replace:
+    post:
+      consumes:
+      - application/json
+      description: Perform find and replace operation in a note, supporting regular
+        expressions
+      parameters:
+      - description: Find and Replace Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.NoteReplaceRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.NoteReplaceResponse'
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Find and replace in note
+      tags:
+      - Note
+  /api/note/restore:
+    put:
+      description: Restore deleted note from trash
+      parameters:
+      - description: Restore Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.NoteRestoreRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.NoteDTO'
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Restore note
+      tags:
+      - Note
+  /api/notes:
+    get:
+      description: Get note list for current user with pagination
+      parameters:
+      - description: Is in recycle bin // 是否在回收站
+        example: false
+        in: query
+        name: isRecycle
+        type: boolean
+      - description: Search keyword // 搜索关键词
+        example: todo
+        in: query
+        name: keyword
+        type: string
+      - description: Comma-separated exact path list for share filter // 逗号分隔的精确路径列表，用于分享筛选
+        example: note1.md,note2.md
+        in: query
+        name: paths
+        type: string
+      - description: Whether to search content // 是否搜索内容
+        example: true
+        in: query
+        name: searchContent
+        type: boolean
+      - description: Search mode (path, content) // 搜索模式（路径、内容）
+        example: content
+        in: query
+        name: searchMode
+        type: string
+      - description: Sort by field // 排序字段
+        example: mtime
+        in: query
+        name: sortBy
+        type: string
+      - description: Sort order // 排序顺序
+        example: desc
+        in: query
+        name: sortOrder
+        type: string
+      - description: Vault name // 保险库名称
+        example: MyVault
+        in: query
+        name: vault
+        required: true
+        type: string
+      - description: Page number // 页码
+        in: query
+        name: page
+        type: integer
+      - description: Page size // 每页数量
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/app.ListRes'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/dto.NoteNoContentDTO'
+                        type: array
+                    type: object
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Get note list
+      tags:
+      - Note
+  /api/notes/share-paths:
+    get:
+      parameters:
+      - description: Vault name
+        in: query
+        name: vault
+        required: true
+        type: string
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  items:
+                    type: string
+                  type: array
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Get active shared note paths
+      tags:
+      - Share
+  /api/setting:
+    delete:
+      consumes:
+      - application/json
+      description: Soft delete a setting by path or pathHash
+      parameters:
+      - description: Delete Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.SettingDeleteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Delete setting
+      tags:
+      - Setting
+    get:
+      description: Get setting info for current user by path or pathHash
+      parameters:
+      - description: Setting path // 配置路径
+        example: User/Theme
+        in: query
+        name: path
+        type: string
+      - description: Path hash // 路径哈希
+        example: hash123
+        in: query
+        name: pathHash
+        type: string
+      - description: Vault name // 保险库名称
+        example: MyVault
+        in: query
+        name: vault
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.SettingDTO'
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Get setting info
+      tags:
+      - Setting
+    post:
+      consumes:
+      - application/json
+      description: Create a new setting or update an existing one
+      parameters:
+      - description: Create/Update Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.SettingModifyOrCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.SettingDTO'
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Create or update setting
+      tags:
+      - Setting
+  /api/setting/rename:
+    post:
+      consumes:
+      - application/json
+      description: Rename a setting and update its path and pathHash
+      parameters:
+      - description: Rename Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.SettingRenameRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.SettingDTO'
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Rename setting
+      tags:
+      - Setting
+  /api/settings:
+    get:
+      description: Get setting list for current user with pagination and keyword filtering
+      parameters:
+      - description: Keyword // 关键词
+        example: User/
+        in: query
+        name: keyword
+        type: string
+      - description: Vault name // 保险库名称
+        example: MyVault
+        in: query
+        name: vault
+        required: true
+        type: string
+      - description: Page number // 页码
+        in: query
+        name: page
+        type: integer
+      - description: Page size // 每页数量
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/app.ListRes'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/dto.SettingDTO'
+                        type: array
+                    type: object
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Get setting list
+      tags:
+      - Setting
+  /api/share:
+    delete:
+      consumes:
+      - application/json
+      description: Cancel a share by ID or path parameters
+      parameters:
+      - description: Cancel Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.ShareCancelRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Cancel share
+      tags:
+      - Share
+    get:
+      description: Get share token and info by vault and path
+      parameters:
+      - description: Resource path // 资源路径
+        example: ReadMe.md
+        in: query
+        name: path
+        required: true
+        type: string
+      - description: Resource path Hash // 资源路径哈希
+        example: hash123
+        in: query
+        name: pathHash
+        required: true
+        type: string
+      - description: Vault name // 保险库名称
+        example: defaultVault
+        in: query
+        name: vault
+        required: true
+        type: string
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.ShareCreateResponse'
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Query share by path
+      tags:
+      - Share
+    post:
+      consumes:
+      - application/json
+      description: Create a share token for a specific note or attachment, automatically
+        resolve attachment references and authorize
+      parameters:
+      - description: Share Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.ShareCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.ShareCreateResponse'
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Create resource share
+      tags:
+      - Share
+  /api/share/file:
+    get:
+      description: Get raw binary data of a specific attachment via share token
+      parameters:
+      - description: Auth Token
+        in: header
+        name: Share-Token
+        required: true
+        type: string
+      - description: Resource ID // 资源 ID
+        example: 1
+        in: query
+        name: id
+        required: true
+        type: integer
+      - description: Share password // 分享密码
+        example: "123456"
+        in: query
+        name: password
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: Success
+          schema:
+            type: file
+      security:
+      - ShareAuthToken: []
+      summary: Get shared attachment content
+      tags:
+      - Share
+  /api/share/note:
+    get:
+      description: Get specific note content (restricted read-only access) via share
+        token
+      parameters:
+      - description: Auth Token
+        in: header
+        name: Share-Token
+        required: true
+        type: string
+      - description: Resource ID // 资源 ID
+        example: 1
+        in: query
+        name: id
+        required: true
+        type: integer
+      - description: Share password // 分享密码
+        example: "123456"
+        in: query
+        name: password
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.NoteDTO'
+              type: object
+      security:
+      - ShareAuthToken: []
+      summary: Get shared note details
+      tags:
+      - Share
+  /api/share/password:
+    post:
+      consumes:
+      - application/json
+      description: Set or update password and expiration time for a share record
+      parameters:
+      - description: Update Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.SharePasswordUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Update share password
+      tags:
+      - Share
+  /api/share/short_link:
+    post:
+      consumes:
+      - application/json
+      description: Call sink.cool API to generate a short link for a given share record
+      parameters:
+      - description: Short Link Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.ShareShortLinkCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  type: string
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Create short link for share
+      tags:
+      - Share
+  /api/shares:
+    get:
+      description: Get all active and inactive shares of the user, supports sorting
+        and pagination
+      parameters:
+      - description: 'Sort field: created_at, updated_at, expires_at (default: created_at)'
+        in: query
+        name: sort_by
+        type: string
+      - description: 'Sort direction: asc or desc (default: desc)'
+        in: query
+        name: sort_order
+        type: string
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Page size
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/app.ListRes'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/dto.ShareListItem'
+                        type: array
+                    type: object
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: List shares
+      tags:
+      - Share
+  /api/storage:
+    delete:
+      parameters:
+      - description: Storage ID
+        format: int64
+        in: query
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Delete storage configuration
+      tags:
+      - Storage
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/dto.StorageDTO'
+                  type: array
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Get storage configuration list
+      tags:
+      - Storage
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Storage Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.StoragePostRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.StorageDTO'
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Create or update storage configuration
+      tags:
+      - Storage
+  /api/storage/enabled_types:
+    get:
+      description: 'Get list of enabled storage types. Possible values: localfs, oss,
+        s3, r2, minio, webdav'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 'Success. Data contains: localfs, oss, s3, r2, minio, webdav'
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  items:
+                    type: string
+                  type: array
+              type: object
+      summary: Get enabled storage types
+      tags:
+      - Storage
+  /api/storage/validate:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Storage Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.StoragePostRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            $ref: '#/definitions/app.Res'
+        "400":
+          description: Invalid Params
+          schema:
+            $ref: '#/definitions/app.Res'
+        "401":
+          description: Token Required
+          schema:
+            $ref: '#/definitions/app.Res'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Validate storage connection
+      tags:
+      - Storage
+  /api/support:
+    get:
+      description: Get support records for the specified language with pagination
+        and sorting
+      parameters:
+      - description: 'Language code (default: en)'
+        in: query
+        name: lang
+        type: string
+      - description: Sort by field (amount, time, name, item)
+        in: query
+        name: sortBy
+        type: string
+      - description: Sort order (asc, desc)
+        in: query
+        name: sortOrder
+        type: string
+      - description: Page number
+        in: query
+        name: page
+        type: integer
+      - description: Page size
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/app.ListRes'
+              type: object
+      summary: Get support records
+      tags:
+      - System
+  /api/sync-logs:
+    get:
+      description: Get sync log list for current user with optional type/action filters
+        and pagination
+      parameters:
+      - description: Action type // 操作类型
+        example: modify
+        in: query
+        name: action
+        type: string
+      - description: 'Resource type: note / file / setting / folder // 资源类型'
+        example: note
+        in: query
+        name: type
+        type: string
+      - description: Vault name (optional filter) // 保险库名称（可选过滤）
+        example: MyVault
+        in: query
+        name: vault
+        type: string
+      - description: Page number // 页码
+        in: query
+        name: page
+        type: integer
+      - description: Page size // 每页数量
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/app.ListRes'
+                  - properties:
+                      list:
+                        items:
+                          $ref: '#/definitions/dto.SyncLogDTO'
+                        type: array
+                    type: object
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Get sync log list
+      tags:
+      - Sync Log
+  /api/user/change_password:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Handle password change request for current user, validate old password and update new password.
+        处理当前用户的修改密码请求，验证旧密码并更新新密码。
+      parameters:
+      - description: Change Password Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UserChangePasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            $ref: '#/definitions/app.Res'
+        "400":
+          description: Invalid Parameters / Old Password Incorrect
+          schema:
+            $ref: '#/definitions/app.Res'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Change user password
+      tags:
+      - User
+  /api/user/info:
+    get:
+      consumes:
+      - application/json
+      description: |-
+        Handle request to get current user info.
+        处理获取当前用户信息的请求。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.UserDTO'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Get user info
+      tags:
+      - User
+  /api/user/login:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Handle user login HTTP request, validate parameters and return auth token.
+        处理用户登录 HTTP 请求，验证参数并返回认证 Token。
+      parameters:
+      - description: Login Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UserLoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.UserDTO'
+              type: object
+        "400":
+          description: Invalid Parameters / Invalid Credentials
+          schema:
+            $ref: '#/definitions/app.Res'
+      summary: User login
+      tags:
+      - User
+  /api/user/register:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Handle user registration HTTP request, validate parameters and call UserService. Registration may be disabled in server settings.
+        处理用户注册 HTTP 请求，验证参数并调用 UserService。注册功能可能在服务器设置中被禁用。
+      parameters:
+      - description: Register Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UserCreateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.UserDTO'
+              type: object
+        "400":
+          description: Invalid Parameters / Registration Disabled / User Already Exists
+          schema:
+            $ref: '#/definitions/app.Res'
+      summary: User registration
+      tags:
+      - User
+  /api/vault:
+    delete:
+      description: Permanently delete a specific note vault and all associated notes
+        and attachments
+      parameters:
+      - description: Vault ID // 保险库 ID
+        example: 1
+        in: query
+        minimum: 1
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Delete vault
+      tags:
+      - Vault
+    get:
+      description: Get all note vaults for current user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/dto.VaultDTO'
+                  type: array
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Get vault list
+      tags:
+      - Vault
+    post:
+      consumes:
+      - application/json
+      description: Be used to create a new vault or update an existing vault configuration
+        based on the ID in the request parameters
+      parameters:
+      - description: Vault Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.VaultPostRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.VaultDTO'
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Create or update vault
+      tags:
+      - Vault
+  /api/vault/force-delete-item:
+    post:
+      consumes:
+      - application/json
+      description: Permanently delete a single note or file (attachment) in a vault
+      parameters:
+      - description: Delete Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.VaultForceDeleteItemRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Force delete a single item
+      tags:
+      - Vault
+  /api/vault/get:
+    get:
+      description: Get specific vault configuration details by vault ID
+      parameters:
+      - description: Vault ID
+        format: int64
+        in: query
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.VaultDTO'
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Get vault details
+      tags:
+      - Vault
+  /api/vault/rebuild-index:
+    post:
+      consumes:
+      - application/json
+      description: Rebuild full-text search index from physical database and files
+        for a specific vault, restricted to webgui client
+      parameters:
+      - description: Rebuild Index Parameters
+        in: body
+        name: params
+        required: true
+        schema:
+          $ref: '#/definitions/dto.VaultRebuildIndexRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            $ref: '#/definitions/app.Res'
+      security:
+      - UserAuthToken: []
+      summary: Rebuild vault FTS index
+      tags:
+      - Vault
+  /api/version:
+    get:
+      description: Get current server software version, Git tag, and build time
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.VersionDTO'
+              type: object
+      summary: Get server version info
+      tags:
+      - System
+  /api/version/probe:
+    get:
+      description: Parallel-probe GitHub and CNB release endpoints, return reachability,
+        latency, recommended source and current selected mode
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.SourceProbeDTO'
+              type: object
+      security:
+      - UserAuthToken: []
+      summary: Probe version sources latency
+      tags:
+      - System
+  /api/webgui/config:
+    get:
+      description: Get non-sensitive configuration required for frontend display,
+        such as font settings, registration status, etc.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Success
+          schema:
+            allOf:
+            - $ref: '#/definitions/app.Res'
+            - properties:
+                data:
+                  $ref: '#/definitions/dto.AdminWebGUIConfig'
+              type: object
+      summary: Get WebGUI basic config
+      tags:
+      - Config
+securityDefinitions:
+  ShareAuthToken:
+    in: header
+    name: Share-Token
+    type: apiKey
+  UserAuthToken:
+    in: header
+    name: token
+    type: apiKey
+swagger: "2.0"

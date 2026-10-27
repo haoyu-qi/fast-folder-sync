@@ -1,0 +1,214 @@
+package app
+
+import (
+	"reflect"
+	"strings"
+
+	"github.com/haierkeys/fast-note-sync-service/pkg/code"
+
+	"github.com/gin-gonic/gin"
+)
+
+// VersionInfo version information // 版本信息
+type VersionInfo struct {
+	Version   string `json:"version"`
+	GitTag    string `json:"gitTag"`
+	BuildTime string `json:"buildTime"`
+	Changelog string `json:"changelog"`
+}
+
+// HistoricalVersion historical version release information
+// HistoricalVersion 历史版本发布信息
+type HistoricalVersion struct {
+	Version          string `json:"version"`          // Version name // 版本号
+	ChangelogContent string `json:"changelogContent"` // Changelog content // 更新日志内容
+}
+
+type CheckVersionInfo struct {
+	GithubAvailable                  bool                `json:"githubAvailable"`
+	VersionIsNew                     bool                `json:"versionIsNew"`
+	VersionNewName                   string              `json:"versionNewName"`
+	VersionNewLink                   string              `json:"versionNewLink"`
+	VersionNewChangelog              string              `json:"versionNewChangelog"`
+	VersionNewChangelogContent       string              `json:"versionNewChangelogContent"`
+	VersionHistory                   []HistoricalVersion `json:"versionHistory"`                   // Service version history between current and latest // 服务端在当前版本和最新版本之间的历史版本
+	PluginVersionIsNew               bool                `json:"pluginVersionIsNew"`
+	PluginVersionNewName             string              `json:"pluginVersionNewName"`
+	PluginVersionNewLink             string              `json:"pluginVersionNewLink"`
+	PluginVersionNewChangelog        string              `json:"pluginVersionNewChangelog"`
+	PluginVersionNewChangelogContent string              `json:"pluginVersionNewChangelogContent"`
+	PluginVersionHistory             []HistoricalVersion `json:"pluginVersionHistory"`             // Plugin version history between current and latest // 插件在当前版本和最新版本之间的历史版本
+	SyncUpChunkNum                   int                 `json:"syncUpChunkNum"`
+	SyncDownChunkNum                 int                 `json:"syncDownChunkNum"`
+	PipelineWindowUp                 int                 `json:"pipelineWindowUp"`   // Negotiated upload pipeline window; 0 = stop-and-wait // 上行流水线窗口协商值；0 = stop-and-wait
+	PipelineWindowDown               int                 `json:"pipelineWindowDown"` // Negotiated download pipeline window; 0 = stop-and-wait // 下行流水线窗口协商值；0 = stop-and-wait
+}
+
+type SupportRecord struct {
+	Time    string `json:"time"`
+	Item    string `json:"item"`
+	Amount  string `json:"amount"`
+	Unit    string `json:"unit"`
+	Message string `json:"message"`
+	Name    string `json:"name"`
+}
+
+type Response struct {
+	Ctx *gin.Context
+}
+
+type Pager struct {
+	Page      int `json:"page"`      // Page number // 页码
+	PageSize  int `json:"pageSize"`  // Page size // 每页数量
+	TotalRows int `json:"totalRows"` // Total rows // 总行数
+}
+
+// PaginationRequest pagination request parameters for Swagger // 分页请求参数（用于 Swagger）
+type PaginationRequest struct {
+	Page     int `json:"page" form:"page" query:"page"`             // Page number // 页码
+	PageSize int `json:"pageSize" form:"pageSize" query:"pageSize"` // Page size // 每页数量
+}
+
+type ListRes struct {
+	List  interface{} `json:"list"`  // Data list // 数据清单
+	Pager Pager       `json:"pager"` // Pagination info // 翻页信息
+}
+
+// Res is the unified response structure: Code/Status/Msg/Data
+// Optional fields Vault and Details use omitempty (will not be serialized if nil)
+// Res 是统一的响应结构：Code/Status/Msg/Data
+// 可选字段 Vault 与 Details 使用 omitempty（nil 则不会被序列化）
+type Res struct {
+	Code      int         `json:"code"`
+	Status    bool        `json:"status"`
+	Message   interface{} `json:"message,omitempty"`
+	Data      interface{} `json:"data,omitempty"`
+	Details   interface{} `json:"details,omitempty"`
+	Vault     interface{} `json:"vault,omitempty"`
+	Context   interface{} `json:"context,omitempty"`
+	Path      interface{} `json:"path,omitempty"`
+	PageIndex interface{} `json:"pageIndex,omitempty"` // 1-BASED wire value: 0/absent = non-paginated message, n>0 = download page n-1 (internal 0-based). 1-based so page 0 stays distinguishable from non-paginated messages under proto3 zero-value elision; only set for paginated download messages on pv>=2 connections. Client-to-server PageAck.pageIndex stays 0-based. // 线上值为 1-BASED：0/缺省 = 非分页消息，n>0 = 下载页 n-1（内部 0-based）。采用 1-based 是为了让第 0 页在 proto3 零值不编码规则下仍可与非分页消息区分；仅 pv>=2 连接的分页下载消息会设置。客户端→服务端的 PageAck.pageIndex 保持 0-based
+}
+
+func NewResponse(ctx *gin.Context) *Response {
+	return &Response{
+		Ctx: ctx,
+	}
+}
+
+// RequestParamStrParse parses request parameters
+// RequestParamStrParse 解析
+// Keep original behavior
+// 保持原有行为
+func RequestParamStrParse(c *gin.Context, param any) {
+	tParam := reflect.TypeOf(param).Elem()
+	vParam := reflect.ValueOf(param).Elem()
+	for i := 0; i < tParam.NumField(); i++ {
+		name := tParam.Field(i).Name
+		if nameType, ok := tParam.FieldByName(name); ok {
+			dstName := nameType.Tag.Get("request")
+			if dstName != "" {
+				paramName := nameType.Tag.Get("form")
+				if value, ok := c.GetQuery(paramName); ok {
+					vParam.FieldByName(dstName).SetString(value)
+				}
+			}
+		}
+	}
+}
+
+// GetRequestIP gets the request IP
+// GetRequestIP 获取 IP 地址
+func GetRequestIP(c *gin.Context) string {
+	reqIP := c.ClientIP()
+	if reqIP == "::1" {
+		reqIP = "127.0.0.1"
+	}
+	return reqIP
+}
+
+func GetAccessHost(c *gin.Context) string {
+	AccessProto := ""
+	if proto := c.Request.Header.Get("X-Forwarded-Proto"); proto == "" {
+		AccessProto = "http" + "://"
+	} else {
+		AccessProto = proto + "://"
+	}
+	return AccessProto + c.Request.Host
+}
+
+// ToResponse output to browser: unified use of Res, set Details and Vault as needed
+// ToResponse 输出到浏览器：统一使用 Res，根据情况设置 Details 与 Vault
+func (r *Response) ToResponse(codeObj *code.Code) {
+	r.Ctx.Set("status_code", codeObj.StatusCode())
+
+	lang := r.Ctx.GetString("lang")
+	content := Res{
+		Code:    codeObj.Code(),
+		Status:  codeObj.Status(),
+		Message: codeObj.MsgIn(lang),
+		Data:    codeObj.Data(),
+	}
+
+	if codeObj.HaveDetails() {
+		content.Details = strings.Join(codeObj.Details(), ",")
+	}
+
+	if codeObj.HaveVault() {
+		// Assume codeObj.Vault() returns a serializable value (string, struct, etc.)
+		// Assume codeObj.Vault() 假设 codeObj.Vault() 返回可序列化的值（string 或 struct 等）
+		content.Vault = codeObj.Vault()
+	}
+
+	r.send(codeObj.StatusCode(), content)
+}
+
+// ToResponseList outputs list response using ListRes as Data; also supports dynamic Vault addition
+// ToResponseList 输出列表响应，使用 ListRes 作为 Data；同样支持 Vault 动态添加
+func (r *Response) ToResponseList(codeObj *code.Code, list interface{}, totalRows int) {
+	r.Ctx.Set("status_code", codeObj.StatusCode())
+
+	lang := r.Ctx.GetString("lang")
+	content := Res{
+		Code:    codeObj.Code(),
+		Status:  codeObj.Status(),
+		Message: codeObj.MsgIn(lang),
+		Data: ListRes{
+			List:  list,
+			Pager: *NewPager(r.Ctx, totalRows),
+		},
+	}
+
+	if codeObj.HaveVault() {
+		content.Vault = codeObj.Vault()
+	}
+
+	r.send(codeObj.StatusCode(), content)
+}
+
+func (r *Response) send(statusCode int, content interface{}) {
+	r.Ctx.JSON(statusCode, content)
+}
+
+// GetClientType extracts client type from request headers or query parameters
+// GetClientType 从请求头或查询参数中提取客户端类型
+func GetClientType(c *gin.Context) string {
+	client := c.GetHeader("x-client")
+	if client == "" {
+		client = c.Query("client")
+	}
+	return client
+}
+
+// IsWebGUIClient checks if the client type string is webgui
+// IsWebGUIClient 判断客户端类型字符串是否为 webgui (不区分大小写)
+func IsWebGUIClient(clientType string) bool {
+	return strings.EqualFold(clientType, "webgui")
+}
+
+// IsWebGUI checks if current request is from webgui client
+// IsWebGUI 判断当前请求是否来自 WebGUI 客户端
+func IsWebGUI(c *gin.Context) bool {
+	return IsWebGUIClient(GetClientType(c))
+}
+

@@ -1,0 +1,51 @@
+name: Folder Sync checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  desktop:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: fast-folder-sync/desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: fast-folder-sync/desktop/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npm run check
+      - run: npm test
+  server:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: fast-folder-sync-service
+    env:
+      CGO_ENABLED: 0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: fast-folder-sync-service/web/package-lock.json
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: fast-folder-sync-service/go.mod
+          cache-dependency-path: fast-folder-sync-service/go.sum
+      - run: npm ci
+        working-directory: fast-folder-sync-service/web
+      - run: npm run check && npm test && npm run build
+        working-directory: fast-folder-sync-service/web
+      - run: go test ./internal/routers/api_router ./internal/routers/websocket_router ./internal/middleware ./internal/service ./pkg/util ./pkg/storage/local_fs
+      - run: go build -trimpath -o /tmp/fast-folder-sync-service .

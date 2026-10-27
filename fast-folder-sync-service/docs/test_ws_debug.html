@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FNSS Websocket Debug Platform</title>
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg-dark: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --border: rgba(255, 255, 255, 0.1);
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --success: #10b981;
+            --error: #ef4444;
+            --warning: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", "Liberation Sans", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+            font-size: 14px;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            background-image:
+                radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.1) 0px, transparent 50%);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+        }
+
+        h1 {
+            font-size: 2rem;
+            margin-bottom: 2rem;
+            background: linear-gradient(to right, #818cf8, #34d399);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 800;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1400px;
+            display: grid;
+            grid-template-columns: 450px 1fr;
+            gap: 2rem;
+            align-items: start;
+        }
+
+        .left-column {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1.5rem;
+            background: rgba(15, 23, 42, 0.4);
+            padding: 0.25rem;
+            border-radius: 0.75rem;
+            border: 1px solid var(--border);
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 0.6rem;
+            text-align: center;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: all 0.2s;
+            color: var(--text-muted);
+            min-width: 80px;
+        }
+
+        .tab.active {
+            background: var(--primary);
+            color: white;
+            box-shadow: 0 4px 10px rgba(99, 102, 241, 0.3);
+        }
+
+        .card h2 {
+            margin-bottom: 1rem;
+            font-size: 1.05rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text);
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.3rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        input,
+        textarea,
+        select {
+            width: 100%;
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 0.6rem;
+            color: var(--text);
+            outline: none;
+            transition: border-color 0.2s;
+            font-size: 0.85rem;
+        }
+
+        input:focus,
+        textarea:focus {
+            border-color: var(--primary);
+        }
+
+        .btn-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.4rem;
+            font-size: 0.9rem;
+        }
+
+        button:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        button.outline {
+            background: transparent;
+            border: 1px solid var(--primary);
+            color: var(--primary);
+        }
+
+        button.success {
+            background: var(--success);
+        }
+
+        button.danger {
+            background: var(--error);
+        }
+
+        button.warning {
+            background: var(--warning);
+        }
+
+        #log {
+            height: calc(100vh - 280px);
+            min-height: 1000px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            font-family: 'Fira Code', 'Cascadia Code', monospace;
+            font-size: 0.8rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        #log pre {
+            white-space: pre-wrap;
+            word-break: break-all;
+            margin-top: 0.5rem;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            font-size: 0.75rem;
+            display: none;
+            /* Default hidden */
+            cursor: pointer;
+        }
+
+        #log .log-entry.expanded pre {
+            display: block;
+            /* Expanded state */
+        }
+
+        .log-entry {
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            border-left: 3px solid transparent;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .log-entry:hover {
+            background: rgba(255, 255, 255, 0.08) !important;
+        }
+
+        .log-entry.send {
+            border-left-color: var(--primary);
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        .log-entry.recv {
+            border-left-color: var(--success);
+            background: rgba(16, 185, 129, 0.05);
+        }
+
+        .log-entry.err {
+            border-left-color: var(--error);
+            background: rgba(239, 68, 68, 0.05);
+        }
+
+        .log-entry.info {
+            border-left-color: var(--text-muted);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .time {
+            color: var(--text-muted);
+            font-size: 0.7rem;
+            margin-right: 0.5rem;
+        }
+
+        .tag {
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        .send .tag {
+            color: var(--primary);
+        }
+
+        .recv .tag {
+            color: var(--success);
+        }
+
+        .err .tag {
+            color: var(--error);
+        }
+
+        .tag-arrow {
+            display: inline-block;
+            margin-right: 0.25rem;
+            font-weight: bold;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .status-connected {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .status-disconnected {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--error);
+        }
+
+        .progress-container {
+            margin-top: 1rem;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 999px;
+            height: 8px;
+            overflow: hidden;
+            display: none;
+        }
+
+        #progressBar {
+            background: linear-gradient(90deg, var(--primary), var(--success));
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        @media (max-width: 1100px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+
+            #log {
+                height: 500px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <h1>FNSS Websocket Debug Platform</h1>
+
+    <div class="container">
+        <!-- Left Column -->
+        <div class="left-column">
+            <!-- Mode Tabs -->
+            <div class="tabs">
+                <div class="tab active" onclick="switchMode('setting')">Config</div>
+                <div class="tab" onclick="switchMode('note')">Note</div>
+                <div class="tab" onclick="switchMode('file')">File</div>
+                <div class="tab" onclick="switchMode('folder')">Folder</div>
+            </div>
+
+            <!-- Auth Card -->
+            <div class="card">
+                <h2>🔐 Connection & Auth</h2>
+                <div class="form-group">
+                    <label>API URL</label>
+                    <input type="text" id="apiUrl" value="ws://localhost:9000/api/user/sync">
+                </div>
+                <div id="authPanel">
+                    <div class="form-group">
+                        <label>Account (Email/User)</label>
+                        <input type="text" id="credentials" value="test@example.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="password" value="123456">
+                    </div>
+                    <button onclick="login()" id="loginBtn" style="width: 100%;">Login & Get Token</button>
+                </div>
+
+                <div style="margin: 1.5rem 0; border-top: 1px solid var(--border); padding-top: 1rem;">
+                    <div style="text-align: center; color: var(--text-muted); font-size: 0.75rem; margin-bottom: 1rem; opacity: 0.8;">
+                        —— OR DIRECT CONNECT ——
+                    </div>
+                    <div class="form-group">
+                        <label>Direct WS URL</label>
+                        <input type="text" id="directWsUrl" value="ws://localhost:9000/api/user/sync">
+                    </div>
+                    <div class="form-group">
+                        <label>Direct Token</label>
+                        <input type="text" id="directToken" placeholder="Paste your token here">
+                    </div>
+                    <button onclick="directConnect()" class="warning" style="width: 100%;">Direct Connect (Skip Login)</button>
+                </div>
+
+                <div id="connPanel" style="display: none; margin-top: 1.5rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div id="wsStatus" class="status-badge status-disconnected">Disconnected</div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button onclick="connectWS()" id="connectBtn">Connect WS</button>
+                            <button onclick="disconnectWS()" class="danger" id="disconnectBtn"
+                                style="display:none">Disconnect</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Operations Card -->
+            <div class="card" id="opCard">
+                <h2 id="opTitle">⚙️ Setting Operations</h2>
+
+                <!-- Common Config -->
+                <div class="form-group">
+                    <label>Vault</label>
+                    <input type="text" id="vault" value="DefaultVault">
+                </div>
+                <div class="form-group">
+                    <label id="pathLabel">Remote Path</label>
+                    <input type="text" id="path" value="config/theme.json">
+                </div>
+                 <div class="form-group">
+                     <label>PathHash (Calculated: Hash32)</label>
+                     <input type="text" id="commonPathHash" readonly style="font-size: 0.7rem; opacity: 0.7; background: #1e293b;">
+                 </div>
+
+                <!-- Setting Inputs -->
+                <div id="settingInputs">
+                    <div class="form-group">
+                        <label>Content (JSON/Text)</label>
+                        <textarea id="settingContent" rows="4">{"theme": "dark", "fontSize": 14}</textarea>
+                    </div>
+                     <div class="form-group">
+                        <label>ContentHash (Calculated: Hash32)</label>
+                        <input type="text" id="settingContentHash" readonly style="font-size: 0.7rem; opacity: 0.7; background: #1e293b;">
+                    </div>
+                     <div class="btn-group">
+                        <button onclick="sendSettingWS('SettingModify')" class="success">Modify/Create</button>
+                        <button onclick="sendSettingWS('SettingModifyCheck')" class="outline">Check</button>
+                        <button onclick="sendSettingWS('SettingDelete')" class="danger">Delete</button>
+                        <button onclick="sendSettingWS('SettingSync')" class="warning">Sync</button>
+                        <button onclick="sendSettingWS('SettingClear')" class="danger">Clear All</button>
+                    </div>
+                </div>
+
+                <!-- Note Inputs -->
+                <div id="noteInputs" style="display: none;">
+                    <div class="form-group">
+                        <label>Note Content</label>
+                        <textarea id="noteContent" rows="4" placeholder="Markdown content..."># Hello World</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>ContentHash (Calculated: Hash32)</label>
+                        <input type="text" id="noteContentHash" readonly style="font-size: 0.7rem; opacity: 0.7; background: #1e293b;">
+                    </div>
+                     <div class="form-group">
+                        <label>Old Path (For Rename)</label>
+                        <input type="text" id="noteOldPath" placeholder="Old path for rename...">
+                    </div>
+                    <div class="btn-group">
+                        <button onclick="sendNoteWS('NoteModify')" class="success">Modify/Create</button>
+                        <button onclick="sendNoteWS('NoteModifyCheck')" class="outline">Check</button>
+                        <button onclick="sendNoteWS('NoteDelete')" class="danger">Delete</button>
+                        <button onclick="sendNoteWS('NoteRename')" class="warning">Rename</button>
+                        <button onclick="sendNoteWS('NoteRePush')" class="outline">RePush (Get)</button>
+                        <button onclick="sendNoteWS('NoteSync')" class="warning">Sync</button>
+                    </div>
+                </div>
+
+                <!-- File Inputs -->
+                <div id="fileInputs" style="display: none;">
+                    <div class="tabs" style="margin-bottom: 1rem; font-size: 0.8rem;">
+                        <div class="tab active"  onclick="toggleFileMode('upload')">Upload</div>
+                        <div class="tab" onclick="toggleFileMode('download')">Download</div>
+                         <div class="tab" onclick="toggleFileMode('manage')">Manage</div>
+                    </div>
+
+                    <div id="fileUploadPanel">
+                         <div class="form-group">
+                            <label>Select File</label>
+                            <input type="file" id="fileInput">
+                        </div>
+                        <div class="form-group">
+                             <label>ContentHash (SHA-256)</label>
+                             <input type="text" id="fileContentHash" readonly style="font-size: 0.7rem; opacity: 0.7; background: #1e293b;">
+                        </div>
+                         <button onclick="startFileUpload()" id="uploadBtn" disabled style="width: 100%; background: var(--success);">
+                            Start Upload
+                        </button>
+                    </div>
+
+                    <div id="fileDownloadPanel" style="display: none;">
+                         <button onclick="startFileDownload()" id="downloadBtn" style="width: 100%; background: var(--primary);">
+                            Start Download
+                        </button>
+                    </div>
+
+                    <div id="fileManagePanel" style="display: none;">
+                         <div class="form-group">
+                            <label>Old Path (For Rename)</label>
+                            <input type="text" id="fileOldPath">
+                        </div>
+                        <div class="btn-group">
+                             <button onclick="sendFileWS('FileDelete')" class="danger">Delete</button>
+                             <button onclick="sendFileWS('FileRename')" class="warning">Rename</button>
+                             <button onclick="sendFileWS('FileSync')" class="outline">Sync List</button>
+                        </div>
+                    </div>
+
+                    <!-- Progress -->
+                    <div class="progress-container" id="progressContainer">
+                        <div id="progressBar"></div>
+                    </div>
+                    <div id="progressText" style="font-size: 0.75rem; text-align: center; margin-top: 0.5rem; color: var(--text-muted); min-height: 1rem;"></div>
+                </div>
+
+
+                <!-- Folder Inputs -->
+                 <div id="folderInputs" style="display: none;">
+                     <div class="form-group">
+                        <label>Old Path (For Rename)</label>
+                        <input type="text" id="folderOldPath">
+                    </div>
+                    <div class="btn-group">
+                        <button onclick="sendFolderWS('FolderModify')" class="success">Create</button>
+                        <button onclick="sendFolderWS('FolderDelete')" class="danger">Delete</button>
+                        <button onclick="sendFolderWS('FolderRename')" class="warning">Rename</button>
+                        <button onclick="sendFolderWS('FolderSync')" class="outline">Sync</button>
+                    </div>
+                 </div>
+
+                 <!-- Common Timestamps -->
+                 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+                    <div class="form-group">
+                        <label>Ctime (ms)</label>
+                        <input type="number" id="ctime" style="font-size: 0.7rem;">
+                    </div>
+                    <div class="form-group">
+                        <label>Mtime (ms)</label>
+                        <input type="number" id="mtime" style="font-size: 0.7rem;">
+                    </div>
+                     <div class="form-group">
+                        <label>LastTime (Sync)</label>
+                        <input type="number" id="lastTime" value="0" style="font-size: 0.7rem;">
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Log Panel -->
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h2>📜 Communication Log</h2>
+                <button onclick="clearLog()" class="outline" style="padding: 0.25rem 0.75rem; font-size: 0.75rem;">Clear</button>
+            </div>
+            <div id="log"></div>
+        </div>
+    </div>
+
+    <script>
+        let socket = null;
+        let token = '';
+        let activeMode = 'setting';
+        let fileUploadFile = null;
+
+        // Hash32 Implementation (Matches Go []rune iteration)
+        function getHash32(content) {
+            let hash = 0;
+            for (const char of content) {
+                const code = char.codePointAt(0);
+                hash = ((hash << 5) - hash) + code;
+                hash |= 0; // Force 32-bit integer
+            }
+            return String(hash);
+        }
+
+        async function getFileHash(file) {
+             const buffer = await file.arrayBuffer();
+             const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+             const hashArray = Array.from(new Uint8Array(hashBuffer));
+             const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+             return hashHex;
+        }
+
+        // --- UI Logic ---
+
+        function switchMode(mode) {
+            activeMode = mode;
+            // Update UI tabs
+            ['setting', 'note', 'file', 'folder'].forEach(m => {
+               // Simple toggle class logic could be added here if we assigned IDs to tabs
+            });
+            document.querySelectorAll('.tabs:first-child .tab').forEach(t => t.classList.remove('active'));
+            // Find index
+            const idx = ['setting', 'note', 'file', 'folder'].indexOf(mode);
+            if(idx >= 0) document.querySelectorAll('.tabs:first-child .tab')[idx].classList.add('active');
+
+            // Update Title
+            document.getElementById('opTitle').textContent = `⚙️ ${mode.charAt(0).toUpperCase() + mode.slice(1)} Operations`;
+
+            // Toggle Panels
+            document.getElementById('settingInputs').style.display = mode === 'setting' ? 'block' : 'none';
+            document.getElementById('noteInputs').style.display = mode === 'note' ? 'block' : 'none';
+            document.getElementById('fileInputs').style.display = mode === 'file' ? 'block' : 'none';
+            document.getElementById('folderInputs').style.display = mode === 'folder' ? 'block' : 'none';
+
+            updateHashes();
+        }
+
+        function toggleFileMode(mode) {
+            document.getElementById('fileUploadPanel').style.display = mode === 'upload' ? 'block' : 'none';
+            document.getElementById('fileDownloadPanel').style.display = mode === 'download' ? 'block' : 'none';
+            document.getElementById('fileManagePanel').style.display = mode === 'manage' ? 'block' : 'none';
+
+             // Update tabs state
+             const tabs = document.querySelectorAll('#fileInputs .tab');
+             tabs.forEach(t => t.classList.remove('active'));
+             if(mode === 'upload') tabs[0].classList.add('active');
+             if(mode === 'download') tabs[1].classList.add('active');
+             if(mode === 'manage') tabs[2].classList.add('active');
+        }
+
+        function updateHashes() {
+            const path = document.getElementById('path').value;
+            document.getElementById('commonPathHash').value = getHash32(path);
+
+            if (activeMode === 'setting') {
+                const content = document.getElementById('settingContent').value;
+                document.getElementById('settingContentHash').value = getHash32(content);
+            } else if (activeMode === 'note') {
+                 const content = document.getElementById('noteContent').value;
+                document.getElementById('noteContentHash').value = getHash32(content);
+            }
+            // File hash is updated on file select
+        }
+
+        // Auto update hashes on input
+        document.getElementById('path').addEventListener('input', updateHashes);
+        document.getElementById('settingContent').addEventListener('input', updateHashes);
+        document.getElementById('noteContent').addEventListener('input', updateHashes);
+
+        document.getElementById('fileInput').addEventListener('change', async (e) => {
+            if (e.target.files.length > 0) {
+                fileUploadFile = e.target.files[0];
+                document.getElementById('path').value = fileUploadFile.name; // Auto set path
+                document.getElementById('fileContentHash').value = "Calculating...";
+                document.getElementById('fileContentHash').value = await getFileHash(fileUploadFile);
+                document.getElementById('uploadBtn').disabled = false;
+                updateHashes(); // Update path hash
+            }
+        });
+
+        // Init timestamps
+        const now = Date.now();
+        document.getElementById('ctime').value = now;
+        document.getElementById('mtime').value = now;
+
+
+        // --- Networking ---
+        function addLog(type, tag, content) {
+            const logEl = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const time = new Date().toLocaleTimeString();
+            const json = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+            entry.innerHTML = `<span class="time">${time}</span> <span class="tag">[${tag}]</span> <pre>${json}</pre>`;
+            entry.onclick = () => entry.classList.toggle('expanded');
+            logEl.appendChild(entry);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+        function clearLog() { document.getElementById('log').innerHTML = ''; }
+
+        async function login() {
+            const apiUrl = document.getElementById('apiUrl').value.replace('ws://', 'http://').replace('/api/user/sync', '/api/user/login');
+            const credentials = document.getElementById('credentials').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const res = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({credentials, password})
+                });
+                const data = await res.json();
+                if(data.status && data.data.token) {
+                    token = data.data.token;
+                    addLog('recv', 'Login', 'Success, Token received.');
+                    document.getElementById('connPanel').style.display = 'block';
+                } else {
+                    addLog('err', 'Login', data);
+                }
+            } catch(e) {
+                addLog('err', 'Login', e.message);
+            }
+        }
+
+        function directConnect() {
+            const url = document.getElementById('directWsUrl').value;
+            const dToken = document.getElementById('directToken').value;
+            if (!url || !dToken) {
+                alert('Please provide both WS URL and Token');
+                return;
+            }
+
+            token = dToken;
+            document.getElementById('apiUrl').value = url;
+            document.getElementById('connPanel').style.display = 'block';
+            connectWS();
+        }
+
+        function connectWS() {
+             if (!token) return alert('Login first');
+             const url = document.getElementById('apiUrl').value;
+             socket = new WebSocket(url);
+             socket.onopen = () => {
+                 document.getElementById('wsStatus').className = 'status-badge status-connected';
+                 document.getElementById('wsStatus').innerText = 'Connected';
+                 sendWS('Authorization', token);
+             };
+             socket.onmessage = (e) => {
+                 if (e.data instanceof Blob) {
+                     addLog('recv', 'Binary', `Received ${e.data.size} bytes`);
+                     return;
+                 }
+                 const raw = e.data;
+                 const idx = raw.indexOf('|');
+                 if(idx > 0) {
+                     const type = raw.substring(0, idx);
+                     const body = raw.substring(idx+1);
+                     try {
+                         const json = JSON.parse(body);
+                         addLog('recv', type, json);
+                         // Handle specific responses
+                         if(type === 'Authorization' && json.status) {
+                             document.getElementById('disconnectBtn').style.display = 'block';
+                             document.getElementById('connectBtn').style.display = 'none';
+                         }
+                         if (type === 'FileSyncUpload') { // Server allowed upload
+                              handleUploadChunks(json.data);
+                         }
+                         if (type === 'FileSyncChunkDownload') { // Server ready to download
+                              handleDownloadChunks(json.data);
+                         }
+
+                     } catch(e) {
+                         addLog('recv', type, body);
+                     }
+                 } else {
+                     addLog('recv', 'Unknown', raw);
+                 }
+             };
+             socket.onclose = () => {
+                 document.getElementById('wsStatus').className = 'status-badge status-disconnected';
+                 document.getElementById('wsStatus').innerText = 'Disconnected';
+                  document.getElementById('disconnectBtn').style.display = 'none';
+                  document.getElementById('connectBtn').style.display = 'block';
+             };
+        }
+
+        function disconnectWS() { if(socket) socket.close(); }
+
+        function sendWS(type, data) {
+            if(!socket) return;
+            const payload = typeof data === 'string' ? data : JSON.stringify(data);
+             socket.send(`${type}|${payload}`);
+             if(type !== 'Authorization') addLog('send', type, data);
+        }
+
+        // --- Action Handlers ---
+
+        function getCommonParams() {
+            return {
+                vault: document.getElementById('vault').value,
+                path: document.getElementById('path').value,
+                pathHash: getHash32(document.getElementById('path').value),
+                ctime: parseInt(document.getElementById('ctime').value),
+                mtime: parseInt(document.getElementById('mtime').value)
+            };
+        }
+
+        function sendSettingWS(action) {
+            const params = getCommonParams();
+            if(action === 'SettingModify' || action === 'SettingModifyCheck') {
+                const content = document.getElementById('settingContent').value;
+                params.contentHash = getHash32(content);
+                if (action === 'SettingModify') params.content = content;
+            }
+             if (action === 'SettingSync') {
+                sendWS(action, {
+                    vault: params.vault,
+                    lastTime: parseInt(document.getElementById('lastTime').value),
+                    settings: []
+                });
+                return;
+            }
+             if (action === 'SettingClear') {
+                 sendWS(action, { vault: params.vault });
+                 return;
+             }
+            sendWS(action, params);
+        }
+
+        function sendNoteWS(action) {
+            const params = getCommonParams();
+            if (action === 'NoteModify' || action === 'NoteModifyCheck') {
+                 const content = document.getElementById('noteContent').value;
+                 params.contentHash = getHash32(content);
+                 if (action === 'NoteModify') params.content = content;
+            }
+            if (action === 'NoteRename') {
+                const oldPath = document.getElementById('noteOldPath').value;
+                sendWS(action, {
+                    vault: params.vault,
+                    path: params.path,
+                    pathHash: params.pathHash,
+                    oldPath: oldPath,
+                    oldPathHash: getHash32(oldPath)
+                });
+                return;
+            }
+            if (action === 'NoteSync') {
+                 sendWS(action, {
+                    vault: params.vault,
+                    lastTime: parseInt(document.getElementById('lastTime').value),
+                    notes: []
+                });
+                return;
+            }
+             if (action === 'NoteRePush') {
+                 // NoteRePush uses NoteGetRequest structure
+                  sendWS(action, {
+                    vault: params.vault,
+                    path: params.path,
+                    pathHash: params.pathHash
+                });
+                return;
+             }
+            sendWS(action, params);
+        }
+
+        function sendFolderWS(action) {
+            const params = getCommonParams();
+             if (action === 'FolderRename') {
+                const oldPath = document.getElementById('folderOldPath').value;
+                sendWS(action, {
+                    vault: params.vault,
+                    path: params.path,
+                    pathHash: params.pathHash,
+                    oldPath: oldPath,
+                    oldPathHash: getHash32(oldPath)
+                });
+                return;
+            }
+             if (action === 'FolderSync') {
+                 sendWS(action, {
+                    vault: params.vault,
+                    lastTime: parseInt(document.getElementById('lastTime').value),
+                    folders: []
+                });
+                return;
+            }
+             // FolderCreateRequest / FolderDeleteRequest
+            sendWS(action, params);
+        }
+
+        function sendFileWS(action) {
+             const params = getCommonParams();
+             if (action === 'FileRename') {
+                const oldPath = document.getElementById('fileOldPath').value;
+                sendWS(action, {
+                    vault: params.vault,
+                    path: params.path,
+                    pathHash: params.pathHash,
+                    oldPath: oldPath,
+                    oldPathHash: getHash32(oldPath)
+                });
+                return;
+            }
+             if (action === 'FileSync') {
+                 sendWS(action, {
+                    vault: params.vault,
+                    lastTime: parseInt(document.getElementById('lastTime').value),
+                    files: []
+                });
+                return;
+            }
+             if (action === 'FileDelete') {
+                 sendWS(action, params);
+                 return;
+             }
+        }
+
+        // --- File Upload / Download Logic ---
+
+        function startFileUpload() {
+            if(!fileUploadFile) return alert('Select file first');
+            const params = getCommonParams();
+            params.size = fileUploadFile.size;
+            params.contentHash = document.getElementById('fileContentHash').value;
+            // First check
+            sendWS('FileUploadCheck', params);
+        }
+
+        function handleUploadChunks(sessionData) {
+            // sessionData: { sessionId, chunkSize, path }
+            const chunkSize = sessionData.chunkSize;
+            const sessionId = sessionData.sessionId;
+            const file = fileUploadFile;
+            let offset = 0;
+            let chunkIndex = 0;
+
+            addLog('info', 'Upload', `Starting upload for session ${sessionId}, chunk size ${chunkSize}`);
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const chunkBuffer = e.target.result; // ArrayBuffer
+                // Construct binary message: SessionID(36) + ChunkIndex(4 BigEndian) + Data
+                const header = new Uint8Array(40);
+                // SessionID string to bytes
+                for(let i=0; i<36; i++) header[i] = sessionId.charCodeAt(i);
+                // ChunkIndex BigEndian uint32
+                new DataView(header.buffer).setUint32(36, chunkIndex, false);
+
+                const chunkData = new Uint8Array(chunkBuffer);
+                const packet = new Uint8Array(header.length + chunkData.length);
+                packet.set(header, 0);
+                packet.set(chunkData, 40);
+
+                socket.send(packet);
+
+                offset += chunkData.length;
+                chunkIndex++;
+                updateProgress(offset, file.size);
+
+                if (offset < file.size) {
+                    readNextChunk();
+                } else {
+                    addLog('success', 'Upload', 'All chunks sent');
+                }
+            };
+
+            function readNextChunk() {
+                const slice = file.slice(offset, offset + chunkSize);
+                reader.readAsArrayBuffer(slice);
+            }
+            readNextChunk();
+        }
+
+        function startFileDownload() {
+             const params = getCommonParams();
+             sendWS('FileChunkDownload', params);
+        }
+
+        function handleDownloadChunks(sessionData) {
+            // sessionData: { sessionId, chunkSize, totalChunks, size, path }
+            // For now, browser receiving binary chunks via WebSocket is tricky if mixed with text frames.
+            // The server sends binary frames for file chunks?
+            // Checking server code: `c.Conn.WriteMessage(websocket.BinaryMessage, ...)`
+            // Yes.
+            addLog('info', 'Download', `Server prepared download: ${sessionData.size} bytes`);
+        }
+
+
+        function updateProgress(loaded, total) {
+            const percent = Math.floor((loaded / total) * 100);
+            document.getElementById('progressBar').style.width = `${percent}%`;
+            document.getElementById('progressText').innerText = `${percent}% (${loaded}/${total})`;
+            document.getElementById('progressContainer').style.display = 'block';
+        }
+
+    </script>
+</body>
+</html>

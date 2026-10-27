@@ -1,0 +1,350 @@
+package service
+
+import (
+	"archive/tar"
+	"compress/gzip"
+	"context"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"sync"
+	"time"
+
+	"github.com/haierkeys/fast-note-sync-service/pkg/code"
+	"github.com/haierkeys/fast-note-sync-service/pkg/safego"
+	"go.uber.org/zap"
+)
+
+// CloudflareService provides Cloudflare Tunnel service
+// CloudflareService 提供 Cloudflare Tunnel 隧道服务
+type CloudflareService interface {
+	Start(ctx context.Context, token string, logEnabled bool) error
+	Stop(ctx context.Context) error
+	TunnelURL() string
+	// DownloadBinary downloads the cloudflared binary and returns the path or a detailed error
+	// DownloadBinary 下载 cloudflared 二进制文件，返回路径或包含手动下载建议的详细错误
+	DownloadBinary() (string, error)
+	// IsBinaryExist checks if the cloudflared binary exists on the disk
+	// IsBinaryExist 检查本地是否存在 cloudflared 隧道二进制程序
+	IsBinaryExist() bool
+}
+
+type cloudflareService struct {
+	logger     zap.Logger
+	token      string
+	logEnabled bool
+	url        string
+	ctx        context.Context
+	cancel     context.CancelFunc
+	wg         sync.WaitGroup
+	cmd        *exec.Cmd
+}
+
+// NewCloudflareService creates a new Cloudflare service
+// NewCloudflareService 创建一个新的 Cloudflare 服务
+func NewCloudflareService(logger *zap.Logger) CloudflareService {
+	return &cloudflareService{
+		logger: *logger,
+	}
+}
+
+// Start starts the Cloudflare tunnel
+// Start 启动 Cloudflare 隧道
+func (s *cloudflareService) Start(ctx context.Context, token string, logEnabled bool) error {
+	if token == "" {
+		return fmt.Errorf("cloudflare tunnel token is required")
+	}
+	s.token = token
+	s.logEnabled = logEnabled
+
+	s.ctx, s.cancel = context.WithCancel(ctx)
+
+	s.logger.Info("Starting Cloudflare Tunnel service...")
+
+	// Ensure binary exists
+	// 确保二进制文件存在
+	binPath, err := s.DownloadBinary()
+	if err != nil {
+		return err
+	}
+
+	s.wg.Add(1)
+	safego.Go(&s.logger, func() {
+		defer s.wg.Done()
+		if err := s.runTunnelProcess(s.ctx, binPath, token); err != nil {
+			s.logger.Error("Cloudflare Tunnel process failed", zap.Error(err))
+		}
+	})
+
+	return nil
+}
+
+// DownloadBinary implements active download logic
+// DownloadBinary 实现主动下载逻辑
+func (s *cloudflareService) DownloadBinary() (string, error) {
+	storageDir := "storage/cloudflared_tunnel"
+	if err := os.MkdirAll(storageDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create storage directory: %w", err)
+	}
+
+	ext := ""
+	if runtime.GOOS == "windows" {
+		ext = ".exe"
+	}
+
+	goos := runtime.GOOS
+	goarch := runtime.GOARCH
+	fileName := fmt.Sprintf("cloudflared-%s-%s%s", goos, goarch, ext)
+	binPath := filepath.Join(storageDir, fileName)
+
+	// If file already exists and is executable
+	// 如果文件已存在且可执行
+	if _, err := os.Stat(binPath); err == nil {
+		return binPath, nil
+	}
+
+	// Construct download URL
+	// 构造下载链接
+	var downloadURL string
+	isTarGz := false
+
+	// Try to get the latest release tag for direct stable download link
+	// 尝试获取最新发布标签以构建稳定的直接下载链接
+	tag, err := s.getLatestReleaseTag()
+	if err == nil && tag != "" {
+		s.logger.Info("Found latest cloudflared release tag", zap.String("tag", tag))
+		if goos == "darwin" {
+			downloadURL = fmt.Sprintf("https://github.com/cloudflare/cloudflared/releases/download/%s/cloudflared-darwin-%s.tgz", tag, goarch)
+			isTarGz = true
+		} else {
+			downloadURL = fmt.Sprintf("https://github.com/cloudflare/cloudflared/releases/download/%s/%s", tag, fileName)
+		}
+	} else {
+		s.logger.Warn("Failed to get latest release tag, fallback to latest download link", zap.Error(err))
+		if goos == "darwin" {
+			downloadURL = fmt.Sprintf("https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-%s.tgz", goarch)
+			isTarGz = true
+		} else {
+			downloadURL = "https://github.com/cloudflare/cloudflared/releases/latest/download/" + fileName
+		}
+	}
+
+	s.logger.Info("Cloudflared binary not found, attempting to download...", zap.String("url", downloadURL))
+
+	// Execute download
+	// 执行下载
+	client := &http.Client{Timeout: 5 * time.Minute}
+	resp, err := client.Get(downloadURL)
+	if err != nil {
+		if code.GetGlobalDefaultLang() == "zh_cn" {
+			return "", fmt.Errorf("下载失败:\n%v。 \n[💡 建议] 请手动下载: %s \n并放置于: %s", err, downloadURL, storageDir)
+		}
+		return "", fmt.Errorf("download failed:\n%v. \n[💡 Suggestion] Please manually download from: %s \nAnd place it in: %s", err, downloadURL, storageDir)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		if code.GetGlobalDefaultLang() == "zh_cn" {
+			return "", fmt.Errorf("下载服务器返回状态 %s。 \n[💡 建议] 请手动下载: \n %s \n并放置于: %s", resp.Status, downloadURL, storageDir)
+		}
+		return "", fmt.Errorf("download server returned %s. \n[💡 Suggestion] Please manually download from:\n %s \nAnd place it in: %s", resp.Status, downloadURL, storageDir)
+	}
+
+	if isTarGz {
+		// Extract tar.gz content directly to binPath
+		// 将 tar.gz 内容直接解压到 binPath
+		if err := extractTarGz(resp.Body, binPath); err != nil {
+			return "", fmt.Errorf("failed to extract tar.gz: %w", err)
+		}
+	} else {
+		// Save to file
+		// 保存到文件
+		out, err := os.Create(binPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to create binary file: %w", err)
+		}
+		defer out.Close()
+
+		if _, err = io.Copy(out, resp.Body); err != nil {
+			return "", fmt.Errorf("failed to save binary: %w", err)
+		}
+	}
+
+	// Grant execution permission (Unix)
+	// 赋予执行权限 (Unix)
+	if runtime.GOOS != "windows" {
+		if err := os.Chmod(binPath, 0755); err != nil {
+			return "", err
+		}
+	}
+
+	s.logger.Info("Cloudflared binary downloaded successfully", zap.String("path", binPath))
+	return binPath, nil
+}
+
+// runTunnelProcess runs external process
+// runTunnelProcess 运行外部进程
+func (s *cloudflareService) runTunnelProcess(ctx context.Context, binPath, token string) error {
+	var writers []io.Writer
+	writers = append(writers, os.Stdout)
+
+	var errWriters []io.Writer
+	errWriters = append(errWriters, os.Stderr)
+
+	if s.logEnabled {
+		// Ensure system log directory exists
+		// 确保统一日志目录存在
+		logDir := "storage/logs"
+		if err := os.MkdirAll(logDir, 0755); err != nil {
+			return fmt.Errorf("failed to create log directory: %w", err)
+		}
+		logPath := filepath.Join(logDir, "cloudflared_tunnel.log")
+
+		logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			return fmt.Errorf("failed to open cloudflared log file: %w", err)
+		}
+		defer logFile.Close()
+
+		writers = append(writers, logFile)
+		errWriters = append(errWriters, logFile)
+		s.logger.Info("Cloudflare Tunnel logging enabled", zap.String("logPath", logPath))
+	}
+
+	// Using context.WithCancel ensures child processes are killed when the main context is cancelled
+	// 使用 context.WithCancel 可以确保主 Context 取消时，子进程也被杀死
+	s.cmd = exec.CommandContext(ctx, binPath, "tunnel", "--no-autoupdate", "run", "--token", token)
+
+	s.cmd.Stdout = io.MultiWriter(writers...)
+	s.cmd.Stderr = io.MultiWriter(errWriters...)
+
+	s.logger.Info("Lauching cloudflared process...")
+	if err := s.cmd.Start(); err != nil {
+		return err
+	}
+
+	// Wait for process completion
+	// 等待进程结束
+	if err := s.cmd.Wait(); err != nil && ctx.Err() == nil {
+		return fmt.Errorf("cloudflared exited unexpectedly: %w", err)
+	}
+
+	return nil
+}
+
+// Stop stops the Cloudflare tunnel
+// Stop 停止 Cloudflare 隧道
+func (s *cloudflareService) Stop(ctx context.Context) error {
+	s.logger.Info("Shutting down Cloudflare Tunnel service...")
+	if s.cancel != nil {
+		s.cancel()
+	}
+
+	done := make(chan struct{})
+	safego.Go(&s.logger, func() {
+		s.wg.Wait()
+		close(done)
+	})
+
+	select {
+	case <-done:
+		s.logger.Info("Cloudflare Tunnel process terminated")
+	case <-ctx.Done():
+		s.logger.Warn("Cloudflare Tunnel shutdown timed out")
+	}
+
+	return nil
+}
+
+// TunnelURL returns the current tunnel URL
+// TunnelURL 返回当前隧道 URL
+func (s *cloudflareService) TunnelURL() string {
+	return s.url
+}
+
+// extractTarGz extracts the cloudflared binary from tar.gz stream and writes to destPath
+// extractTarGz 从 tar.gz 流中解压出 cloudflared 二进制并写入 destPath
+func extractTarGz(gzipStream io.Reader, destPath string) error {
+	uncompressedStream, err := gzip.NewReader(gzipStream)
+	if err != nil {
+		return fmt.Errorf("NewReader failed: %w", err)
+	}
+	defer uncompressedStream.Close()
+
+	tarReader := tar.NewReader(uncompressedStream)
+
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break // End of tar archive
+		}
+		if err != nil {
+			return fmt.Errorf("Next() failed: %w", err)
+		}
+
+		if filepath.Base(header.Name) == "cloudflared" {
+			outFile, err := os.OpenFile(destPath, os.O_CREATE|os.O_RDWR|os.O_TRUNC, header.FileInfo().Mode())
+			if err != nil {
+				return fmt.Errorf("OpenFile failed: %w", err)
+			}
+			defer outFile.Close()
+			if _, err := io.Copy(outFile, tarReader); err != nil {
+				return fmt.Errorf("io.Copy failed: %w", err)
+			}
+			return nil
+		}
+	}
+	return fmt.Errorf("cloudflared binary not found in the archive")
+}
+
+// getLatestReleaseTag gets the latest release tag name of cloudflared from GitHub redirect
+// getLatestReleaseTag 从 GitHub 重定向响应中获取最新的 cloudflared 发布标签名称
+func (s *cloudflareService) getLatestReleaseTag() (string, error) {
+	client := &http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+		Timeout: 10 * time.Second,
+	}
+
+	resp, err := client.Head("https://github.com/cloudflare/cloudflared/releases/latest")
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusFound && resp.StatusCode != http.StatusMovedPermanently {
+		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	location := resp.Header.Get("Location")
+	if location == "" {
+		return "", fmt.Errorf("location header not found")
+	}
+
+	// Example: https://github.com/cloudflare/cloudflared/releases/tag/2026.5.2
+	_, version := filepath.Split(location)
+	if version == "" {
+		return "", fmt.Errorf("invalid location format: %s", location)
+	}
+
+	return version, nil
+}
+
+// IsBinaryExist checks if the cloudflared binary exists on the disk
+// IsBinaryExist 检查本地是否存在 cloudflared 隧道二进制程序
+func (s *cloudflareService) IsBinaryExist() bool {
+	storageDir := "storage/cloudflared_tunnel"
+	ext := ""
+	if runtime.GOOS == "windows" {
+		ext = ".exe"
+	}
+	fileName := fmt.Sprintf("cloudflared-%s-%s%s", runtime.GOOS, runtime.GOARCH, ext)
+	binPath := filepath.Join(storageDir, fileName)
+	_, err := os.Stat(binPath)
+	return err == nil
+}

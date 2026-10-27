@@ -1,0 +1,487 @@
+-- sqlite3
+PRAGMA foreign_keys = false;
+
+-- ----------------------------
+-- Table structure for pre_user
+-- ----------------------------
+DROP TABLE IF EXISTS "user";
+
+CREATE TABLE "user" (
+    `uid` integer PRIMARY KEY AUTOINCREMENT,
+    `email` text DEFAULT "",
+    `username` text DEFAULT "",
+    `password` text DEFAULT "",
+    `salt` text DEFAULT "",
+    `token` text DEFAULT "",
+    `avatar` text DEFAULT "",
+    `is_deleted` integer DEFAULT 0,
+    `updated_at` datetime DEFAULT NULL,
+    `created_at` datetime DEFAULT NULL,
+    `deleted_at` datetime DEFAULT NULL
+);
+
+CREATE INDEX `idx_pre_user_email` ON "user"(`email`);
+
+DROP TABLE IF EXISTS "vault";
+
+CREATE TABLE "vault" (
+    "id" integer PRIMARY KEY AUTOINCREMENT,
+    "vault" text DEFAULT '',
+    "note_count" integer DEFAULT 0,
+    "note_size" integer DEFAULT 0,
+    "file_count" integer DEFAULT 0,
+    "file_size" integer DEFAULT 0,
+    "is_deleted" integer DEFAULT 0,
+    "created_at" datetime DEFAULT NULL,
+    "updated_at" datetime DEFAULT NULL
+);
+
+CREATE INDEX "idx_vault_uid" ON "vault" ("vault" ASC);
+
+DROP TABLE IF EXISTS "note";
+
+CREATE TABLE "note" (
+    "id" integer PRIMARY KEY AUTOINCREMENT,
+    "vault_id" integer NOT NULL DEFAULT 0,
+    "action" text DEFAULT '',
+    "rename" integer DEFAULT 0,
+    "fid" integer DEFAULT 0,
+    -- note table : parent folder id, 0 : root
+    "path" text DEFAULT '',
+    "path_hash" text DEFAULT '',
+    "content" text DEFAULT '',
+    "content_hash" text DEFAULT '',
+    "content_last_snapshot" text NOT NULL DEFAULT '',
+    "content_last_snapshot_hash" text NOT NULL DEFAULT '',
+    "version" integer DEFAULT 0,
+    "client_name" text NOT NULL DEFAULT '',
+    "client_type" text NOT NULL DEFAULT '',
+    "client_version" text NOT NULL DEFAULT '',
+    "size" integer DEFAULT 0,
+    "ctime" integer DEFAULT 0,
+    "mtime" integer DEFAULT 0,
+    "updated_timestamp" integer DEFAULT 0,
+    "created_at" datetime DEFAULT NULL,
+    "updated_at" datetime DEFAULT NULL
+);
+
+CREATE INDEX "idx_vault_id_action_fid" ON "note" ("vault_id", "action", "fid" DESC);
+
+CREATE INDEX "idx_vault_id_action_rename" ON "note" ("vault_id", "action", "rename" DESC);
+
+CREATE INDEX "idx_vault_id_rename" ON "note" ("vault_id", "rename" DESC);
+
+CREATE INDEX "idx_vault_id_updated_at" ON "note" ("vault_id", "updated_at" DESC);
+
+CREATE INDEX "idx_vault_id_updated_timestamp" ON "note" ("vault_id", "updated_timestamp" DESC);
+
+CREATE INDEX `idx_vault_id_path` ON `note`(`vault_id`, `path`);
+
+DROP TABLE IF EXISTS "note_history";
+
+CREATE TABLE "note_history" (
+    "id" integer PRIMARY KEY AUTOINCREMENT,
+    "note_id" integer NOT NULL DEFAULT 0,
+    "vault_id" integer NOT NULL DEFAULT 0,
+    "path" text DEFAULT '',
+    "content" text DEFAULT '',
+    "content_hash" text NOT NULL DEFAULT '',
+    "diff_patch" text DEFAULT '',
+    "client_name" text DEFAULT '',
+    "client_type" text DEFAULT '',
+    "client_version" text DEFAULT '',
+    "version" integer DEFAULT 0,
+    "created_at" datetime DEFAULT NULL,
+    "updated_at" datetime DEFAULT NULL
+);
+
+CREATE INDEX "idx_note_history_note_id" ON "note_history" ("note_id");
+
+CREATE INDEX "idx_note_history_version" ON "note_history" ("note_id", "version");
+
+CREATE INDEX "idx_note_history_content_hash" ON "note_history" ("note_id", "content_hash");
+
+DROP TABLE IF EXISTS "file";
+
+CREATE TABLE "file" (
+    "id" integer PRIMARY KEY AUTOINCREMENT,
+    "vault_id" integer NOT NULL DEFAULT 0,
+    "action" text DEFAULT '',
+    "fid" integer DEFAULT 0,
+    -- folder table : parent folder id, 0 : root
+    "path" text DEFAULT '',
+    "path_hash" text DEFAULT '',
+    "content_hash" text DEFAULT '',
+    "save_path" text DEFAULT '',
+    "rename" integer DEFAULT 0,
+    "size" integer NOT NULL DEFAULT 0,
+    "ctime" integer NOT NULL DEFAULT 0,
+    "mtime" integer NOT NULL DEFAULT 0,
+    "updated_timestamp" integer NOT NULL DEFAULT 0,
+    "created_at" datetime DEFAULT NULL,
+    "updated_at" datetime DEFAULT NULL
+);
+
+CREATE INDEX "idx_file_vault_id_action_fid" ON "file" ("vault_id", "action", "fid" DESC);
+
+CREATE INDEX "idx_file_vault_id_path_hash" ON "file" ("vault_id", "path_hash" DESC);
+
+CREATE INDEX "idx_file_vault_id_action_rename" ON "file" ("vault_id", "action", "rename" DESC);
+
+CREATE INDEX "idx_file_vault_id_rename" ON "file" ("vault_id", "rename" DESC);
+
+
+CREATE INDEX "idx_file_vault_id_updated_at" ON "file" ("vault_id", "updated_at" DESC);
+
+CREATE INDEX "idx_file_vault_id_updated_timestamp" ON "file" ("vault_id", "updated_timestamp" DESC);
+
+CREATE INDEX `idx_file_vault_id_path` ON `file`(`vault_id`, `path`);
+
+DROP TABLE IF EXISTS "setting";
+
+CREATE TABLE "setting" (
+    "id" integer PRIMARY KEY AUTOINCREMENT,
+    "vault_id" integer NOT NULL DEFAULT 0,
+    "action" text DEFAULT '',
+    "rename" integer DEFAULT 0,
+    "path" text DEFAULT '',
+    "path_hash" text DEFAULT '',
+    "content" text DEFAULT '',
+    "content_hash" text DEFAULT '',
+    "size" integer DEFAULT 0,
+    "ctime" integer DEFAULT 0,
+    "mtime" integer DEFAULT 0,
+    "updated_timestamp" integer DEFAULT 0,
+    "created_at" datetime DEFAULT NULL,
+    "updated_at" datetime DEFAULT NULL
+);
+
+CREATE INDEX "idx_setting_id_path_hash" ON "setting" ("id", "path_hash" DESC);
+
+CREATE INDEX "idx_setting_id_updated_at" ON "setting" ("id", "updated_at" DESC);
+
+CREATE INDEX "idx_setting_id_updated_timestamp" ON "setting" ("id", "updated_timestamp" DESC);
+
+CREATE INDEX `idx_setting_id_path` ON `setting`(`id`, `path`);
+
+DROP TABLE IF EXISTS "user_share";
+
+CREATE TABLE "user_share" (
+    "id" integer PRIMARY KEY AUTOINCREMENT,
+    "uid" integer NOT NULL DEFAULT 0,
+    "res_type" text NOT NULL DEFAULT '',
+    -- 资源类型: note, file
+    "res_id" integer NOT NULL DEFAULT 0,
+    -- 资源ID
+    "res" text NOT NULL DEFAULT '',
+    -- 资源列表 (JSON: {"note":["id1"],"file":["id2"]})
+    "status" integer DEFAULT 1,
+    -- 1-有效, 2-已撤销
+    "view_count" integer DEFAULT 0,
+    -- 访问次数
+    "last_viewed_at" datetime DEFAULT NULL,
+    "expires_at" datetime DEFAULT NULL,
+    "password" text DEFAULT '',
+    "short_link" text DEFAULT '',
+    "created_at" datetime DEFAULT NULL,
+    "updated_at" datetime DEFAULT NULL
+);
+
+CREATE INDEX "idx_user_share_uid" ON "user_share" ("uid");
+
+CREATE INDEX "idx_user_share_res_type_id" ON "user_share" ("res_type", "res_id");
+
+-- ----------------------------
+-- Table structure for note_link
+-- ----------------------------
+DROP TABLE IF EXISTS "note_link";
+
+CREATE TABLE "note_link" (
+    "id" integer PRIMARY KEY AUTOINCREMENT,
+    "source_note_id" integer NOT NULL,
+    "target_path" text NOT NULL,
+    "target_path_hash" text NOT NULL,
+    "link_text" text,
+    "is_embed" integer DEFAULT 0,
+    "vault_id" integer NOT NULL,
+    "uid" integer NOT NULL,
+    "created_at" datetime DEFAULT NULL
+);
+
+CREATE INDEX "idx_source_note" ON "note_link" ("source_note_id");
+
+CREATE INDEX "idx_target_path_hash" ON "note_link" ("target_path_hash", "vault_id", "uid");
+
+DROP TABLE IF EXISTS "folder";
+
+CREATE TABLE "folder" (
+    "id" integer PRIMARY KEY AUTOINCREMENT,
+    "vault_id" integer NOT NULL DEFAULT 0,
+    "action" text DEFAULT '',
+    "path" text DEFAULT '',
+    "path_hash" text DEFAULT '',
+    "level" integer DEFAULT 0,
+    -- 文件夹层级
+    "fid" integer DEFAULT 0,
+    -- 父级文件夹ID,0 为根目录
+    "ctime" integer NOT NULL DEFAULT 0,
+    "mtime" integer NOT NULL DEFAULT 0,
+    "updated_timestamp" integer NOT NULL DEFAULT 0,
+    "created_at" datetime DEFAULT NULL,
+    "updated_at" datetime DEFAULT NULL
+);
+
+CREATE INDEX "idx_folder_vault_id_path_hash" ON "folder" ("vault_id", "path_hash");
+
+CREATE INDEX `idx_folder_vault_id_path` ON `folder`(`vault_id`, `path`);
+
+CREATE INDEX "idx_folder_vault_id_fid_path" ON "folder" ("vault_id", "fid", "path");
+
+CREATE INDEX "idx_folder_vault_id_level_path" ON "folder" ("vault_id", "level", "path");
+
+CREATE INDEX "idx_folder_vault_id_updated_timestamp" ON "folder" ("vault_id", "updated_timestamp" DESC);
+
+DROP TABLE IF EXISTS "storage";
+
+CREATE TABLE "storage" (
+    "id" integer NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "uid" integer NOT NULL DEFAULT 0,
+    "type" text DEFAULT '',
+    "endpoint" text DEFAULT '',
+    "region" text DEFAULT '',
+    "account_id" text DEFAULT '',
+    "bucket_name" text DEFAULT '',
+    "access_key_id" text DEFAULT '',
+    "access_key_secret" text DEFAULT '',
+    "custom_path" text DEFAULT '',
+    "access_url_prefix" text DEFAULT '',
+    "user" text DEFAULT '',
+    "password" text DEFAULT '',
+    "is_enabled" integer NOT NULL DEFAULT 0,
+    "is_deleted" integer NOT NULL DEFAULT 0,
+    "created_at" datetime DEFAULT NULL,
+    "updated_at" datetime DEFAULT NULL,
+    "deleted_at" datetime DEFAULT NULL
+);
+
+CREATE INDEX "idx_storage_uid" ON "storage" ("uid" DESC);
+
+-- ----------------------------
+-- Table structure for backup_config
+-- ----------------------------
+DROP TABLE IF EXISTS "backup_config";
+
+CREATE TABLE "backup_config" (
+    "id" integer PRIMARY KEY AUTOINCREMENT,
+    "uid" integer NOT NULL DEFAULT 0,
+    "vault_id" integer NOT NULL DEFAULT 0,
+    "type" text DEFAULT '',
+    -- full, incremental, sync
+    "storage_ids" text DEFAULT '',
+    -- JSON array of storage ids: [1, 2]
+    "is_enabled" integer DEFAULT 0,
+    "cron_strategy" text DEFAULT '',
+    -- daily, weekly, monthly, custom
+    "cron_expression" text DEFAULT '',
+    "include_vault_name" integer DEFAULT 0,
+    -- Whether to include vault name in backup file name
+    "retention_days" integer DEFAULT 10,
+    -- Retention policy (days)
+    "last_run_time" datetime DEFAULT NULL,
+    "next_run_time" datetime DEFAULT NULL,
+    "last_status" integer DEFAULT 0,
+    -- 0: Idle, 1: Running, 2: Success, 3: Failed, 4: Stopped, 5: Success but no update
+    "last_message" text DEFAULT '',
+    "password_mode" integer DEFAULT 0, -- 0: None, 1: Fixed, 2: Random
+    "password_value" text DEFAULT '',
+    "created_at" datetime DEFAULT NULL,
+    "updated_at" datetime DEFAULT NULL
+);
+
+CREATE INDEX "idx_backup_config_uid" ON "backup_config" ("uid");
+
+CREATE INDEX "idx_backup_config_next_run_time" ON "backup_config" ("next_run_time");
+
+-- ----------------------------
+-- Table structure for backup_history
+-- ----------------------------
+DROP TABLE IF EXISTS "backup_history";
+
+CREATE TABLE "backup_history" (
+    "id" integer PRIMARY KEY AUTOINCREMENT,
+    "uid" integer NOT NULL DEFAULT 0,
+    "config_id" integer NOT NULL DEFAULT 0,
+    "storage_id" integer NOT NULL DEFAULT 0,
+    "type" text DEFAULT '',
+    -- full, incremental, sync
+    "start_time" datetime DEFAULT NULL,
+    "end_time" datetime DEFAULT NULL,
+    "status" integer DEFAULT 0,
+    -- 0: Idle, 1: Running, 2: Success, 3: Failed, 4: Stopped, 5: Success but no update
+    "file_size" integer DEFAULT 0,
+    -- bytes
+    "file_count" integer DEFAULT 0,
+    "message" text DEFAULT '',
+    "file_path" text DEFAULT '',
+    -- remote path/key
+    "password" text DEFAULT '',
+    "created_at" datetime DEFAULT NULL,
+    "updated_at" datetime DEFAULT NULL
+);
+
+CREATE INDEX "idx_backup_history_uid" ON "backup_history" ("uid", "created_at" DESC);
+
+CREATE INDEX "idx_backup_history_config_id" ON "backup_history" ("config_id");
+
+-- ----------------------------
+-- Table structure for git_sync_config
+-- ----------------------------
+DROP TABLE IF EXISTS "git_sync_config";
+
+CREATE TABLE "git_sync_config" (
+    "id" integer PRIMARY KEY AUTOINCREMENT,
+    "uid" integer NOT NULL DEFAULT 0,
+    "vault_id" integer NOT NULL DEFAULT 0,
+    "repo_url" text DEFAULT '',
+    -- Git 仓库地址, 例如 https://github.com/user/repo.git
+    "username" text DEFAULT '',
+    -- 认证用户名
+    "password" text DEFAULT '',
+    -- 认证密码或 Personal Access Token
+    "branch" text DEFAULT 'main',
+    -- 分支名
+    "is_enabled" integer DEFAULT 0,
+    -- 是否启用自动同步
+    "delay" integer DEFAULT 0,
+    -- 延迟时间（例如同步前等待的时间，单位可以是秒或分钟）
+    "retention_days" integer DEFAULT 0,
+    -- 历史记录保留天数, 0: 不清理, -1: 仅保留最新, >0: 保留天数
+    "last_sync_time" datetime DEFAULT NULL,
+    -- 上次同步时间
+    "last_status" integer DEFAULT 0,
+    -- 0: 闲置, 1: 运行中, 2: 成功, 3: 失败
+    "last_message" text DEFAULT '',
+    -- 同步结果或错误信息
+    "include_config" integer DEFAULT 0,
+    -- 是否开启配置同步
+    "config_sync_rules" text DEFAULT '',
+    -- 存储规则列表的 JSON 数组 (例如 [".obsidian/appearance.json", ".obsidian/plugins/"])
+    "created_at" datetime DEFAULT NULL,
+    "updated_at" datetime DEFAULT NULL
+);
+
+CREATE INDEX "idx_git_sync_config_uid" ON "git_sync_config" ("uid");
+
+-- ----------------------------
+-- Table structure for git_sync_history
+-- ----------------------------
+DROP TABLE IF EXISTS "git_sync_history";
+
+CREATE TABLE "git_sync_history" (
+    "id" integer PRIMARY KEY AUTOINCREMENT,
+    "uid" integer NOT NULL DEFAULT 0,
+    "config_id" integer NOT NULL DEFAULT 0,
+    "start_time" datetime DEFAULT NULL,
+    "end_time" datetime DEFAULT NULL,
+    "status" integer DEFAULT 0,
+    -- 0: Idle, 1: Running, 2: Success, 3: Failed, 4: Shutdown
+    "message" text DEFAULT '',
+    "created_at" datetime DEFAULT NULL,
+    "updated_at" datetime DEFAULT NULL
+);
+
+CREATE INDEX "idx_git_sync_history_uid" ON "git_sync_history" ("uid", "created_at" DESC);
+
+CREATE INDEX "idx_git_sync_history_config_id" ON "git_sync_history" ("config_id");
+
+-- ----------------------------
+-- Table structure for sync_log
+-- ----------------------------
+DROP TABLE IF EXISTS "sync_log";
+
+CREATE TABLE "sync_log" (
+    "id"             integer PRIMARY KEY AUTOINCREMENT,
+    "uid"            integer NOT NULL DEFAULT 0,
+    "vault_id"       integer NOT NULL DEFAULT 0,
+    "type"           text NOT NULL DEFAULT '',  -- 'note', 'file', 'setting', 'folder'
+    "action"         text NOT NULL DEFAULT '',  -- 'create', 'modify', 'soft_delete', 'delete', 'rename', 'restore'
+    "changed_fields" text NOT NULL DEFAULT '',  -- 逗号分隔变更字段，如 'content,mtime' / 'mtime' / 'path'
+    "path"           text DEFAULT '',
+    "path_hash"      text DEFAULT '',
+    "size"           integer DEFAULT 0,
+    "client_name"    text DEFAULT '',
+    "client_type"    text DEFAULT '',
+    "client_version" text DEFAULT '',
+    "status"         integer DEFAULT 1,         -- 1: success, 2: failed
+    "message"        text DEFAULT '',
+    "created_at"     datetime DEFAULT NULL
+);
+
+CREATE INDEX "idx_sync_log_uid_created_at"  ON "sync_log" ("uid", "created_at" DESC);
+CREATE INDEX "idx_sync_log_uid_type_action" ON "sync_log" ("uid", "type", "action");
+
+-- ----------------------------
+-- Table structure for auth_token
+-- ----------------------------
+DROP TABLE IF EXISTS "auth_token";
+
+CREATE TABLE "auth_token" (
+    "id" integer PRIMARY KEY AUTOINCREMENT,
+    "uid" integer NOT NULL DEFAULT 0,
+    "token_string" text NOT NULL DEFAULT '',
+    "scope" text NOT NULL DEFAULT '',
+    "client_type" text NOT NULL DEFAULT '',
+    "bound_ip" text NOT NULL DEFAULT '',
+    "user_agent" text NOT NULL DEFAULT '',
+    "vaults" text NOT NULL DEFAULT '',
+    "status" integer NOT NULL DEFAULT 1,
+    "issue_type" integer NOT NULL DEFAULT 1,
+    "last_used_at" datetime DEFAULT NULL,
+    "expired_at" datetime DEFAULT NULL,
+    "created_at" datetime DEFAULT NULL,
+    "updated_at" datetime DEFAULT NULL
+);
+
+CREATE INDEX "idx_auth_token_uid" ON "auth_token" ("uid");
+CREATE INDEX "idx_auth_token_token_string" ON "auth_token" ("token_string");
+
+-- ----------------------------
+-- Table structure for auth_token_log
+-- ----------------------------
+DROP TABLE IF EXISTS "auth_token_log";
+
+CREATE TABLE "auth_token_log" (
+    "id" integer PRIMARY KEY AUTOINCREMENT,
+    "token_id" integer NOT NULL DEFAULT 0,
+    "uid" integer NOT NULL DEFAULT 0,
+    "protocol" text NOT NULL DEFAULT '',
+    "client" text NOT NULL DEFAULT '',
+    "client_name" text DEFAULT '',
+    "client_version" text DEFAULT '',
+    "ip" text DEFAULT '',
+    "ua" text DEFAULT '',
+    "status_code" integer DEFAULT 0,
+    "created_at" datetime DEFAULT NULL
+);
+
+CREATE INDEX "idx_auth_token_log_token_id" ON "auth_token_log" ("token_id");
+CREATE INDEX "idx_auth_token_log_uid" ON "auth_token_log" ("uid");
+
+-- ----------------------------
+-- Table structure for user_oidc_identity
+-- ----------------------------
+DROP TABLE IF EXISTS "user_oidc_identity";
+
+CREATE TABLE "user_oidc_identity" (
+    "id" integer PRIMARY KEY AUTOINCREMENT,
+    "uid" integer NOT NULL,
+    "issuer" text NOT NULL,
+    "subject" text NOT NULL,
+    "email" text DEFAULT '',
+    "username" text DEFAULT '',
+    "created_at" datetime DEFAULT NULL,
+    "updated_at" datetime DEFAULT NULL
+);
+
+CREATE INDEX "idx_user_oidc_identity_uid" ON "user_oidc_identity" ("uid");
+CREATE UNIQUE INDEX "idx_user_oidc_identity_issuer_subject" ON "user_oidc_identity" ("issuer", "subject");

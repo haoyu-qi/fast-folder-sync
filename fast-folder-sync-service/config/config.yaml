@@ -1,0 +1,527 @@
+server:
+  # 运行模式: release | debug
+  # Running mode: release | debug
+  run-mode: release
+  # HTTP 端口 (默认 :9000)。格式为 :port 或 IP:port
+  # HTTP Port (default :9000). Format: :port or IP:port
+  http-port: ":9000"
+  # 读取超时时间(秒)
+  # Read timeout duration (seconds)
+  read-timeout: 60
+  # 写入超时时间(秒)
+  # Write timeout duration (seconds)
+  write-timeout: 60
+  # 私有 HTTP 监听地址，主要用于监控/度量。留空则不开启。格式: :port
+  # Private HTTP listen address, used for monitoring/metrics. Leave empty to disable. Format: :port
+  private-http-listen: ""
+  # SSE 保活心跳间隔（秒）
+  # MCP SSE ping interval (seconds)
+  mcp-sse-ping-interval: 30
+  # 是否关闭 MCP 的 localhost DNS 重绑定保护。默认 false。
+  # 仅当可信的本机反向代理或 Cloudflare Tunnel 通过 127.0.0.1 连接、同时保留公网 Host 请求头时才开启。
+  # 开启前请确保 MCP 端口不直接暴露给不可信的本地客户端。
+  # Whether to disable MCP localhost DNS rebinding protection. Defaults to false.
+  # Enable only when a trusted local reverse proxy or Cloudflare Tunnel connects through 127.0.0.1 while preserving the public Host header.
+  # Before enabling, ensure the MCP port is not directly exposed to untrusted local clients.
+  mcp-disable-localhost-protection: false
+  # 独立 Web 界面端口。留空则不开启。格式: :port
+  # Independent WebGUI port. Leave empty to disable. Format: :port
+  webgui-port: ""
+  # 独立分享页面端口。留空则不开启。格式: :port
+  # Independent share page port. Leave empty to disable. Format: :port
+  share-port: ""
+  # 外部分享页面基础 URL（例如 https://share.example.com）。当同时设置了 webgui-port 和 share-port 时使用。
+  # External share page base URL (e.g., https://share.example.com). Used when both webgui-port and share-port are set.
+  share-base-url: ""
+  # 外部访问 API 的地址（例如 http://api.example.com:9000）。用于 Web 界面定位。
+  # External API URL (e.g., http://api.example.com:9000). Used for Web interface positioning.
+  ext-api-url: ""
+  # 跨域 Origin 允许白名单，留空则自动从 ext-api-url 推断。
+  # CORS allowed origins. Leave empty to auto-infer from ext-api-url.
+  cors-allowed-origins: []
+  # 可信代理服务器的 IP 或 CIDR 网段白名单（例如 ["192.168.1.100", "10.0.0.0/8"]）。
+  # 只有来自该白名单内代理服务器转发的请求，系统才会信任并解析其携带的 X-Forwarded-Host 和 X-Forwarded-Proto 头部，以防止攻击者伪造 Host/IP 进行漏洞攻击。
+  # 
+  # 部署说明：
+  # 1. 留空（默认值 []）：仅信任本地回环地址（127.0.0.1 和 ::1）。如果 Nginx 或 Cloudflare Tunnel 部署在同一台机器上，请保持留空。
+  # 2. 跨机器部署：如果反向代理（如独立 Nginx 服务器、负载均衡器等）部署在独立的主机上，必须将这些代理服务器的内网 IP / 网段填入该数组中，否则系统将忽略其代理头。
+  # 
+  # Trusted proxies IP/CIDR list (e.g., ["192.168.1.100", "10.0.0.0/8"]).
+  # Only trusts X-Forwarded-Host and X-Forwarded-Proto headers if the request is forwarded by proxies in this whitelist, protecting against HTTP Header injection.
+  # 
+  # Deployment Advice:
+  # 1. Leave empty ([]): Only loopback addresses (127.0.0.1 and ::1) are trusted. Keep it empty if Nginx/Cloudflare Tunnel is on the same machine.
+  # 2. Remote Deployment: If your reverse proxy is on a separate server, you must add its IP or CIDR block to this list.
+  trusted-proxies: []
+
+
+  # 所有请求的自定义 HTTP 响应头
+  # Custom HTTP response headers for all requests
+  custom-response-headers:
+    # "X-Custom-Header": "Custom-Value"
+
+
+app:
+  # 默认每页显示的项目数
+  # Default items per page
+  default-page-size: 10
+  # 每页显示的最大项目数限制
+  # Maximum items limit per page
+  max-page-size: 100
+  # 默认请求上下文超时时间(秒)
+  # Default request context timeout (seconds)
+  default-context-timeout: 60
+  # 临时文件存储路径
+  # Temporary file storage path
+  temp-path: storage/temp
+  # 是否在响应中返回成功详情消息
+  # Whether to return success detail message in response
+  is-return-sussess: false
+  # 软删除笔记保留时长。例如: 7d, 24h。0 表示永久保留。
+  # Retention duration for soft deleted notes. e.g., 7d, 24h. 0 means keep forever.
+  soft-delete-retention-time: "90d"
+  # 同步日志保留时长。例如: 30d, 7d。
+  # Retention duration for sync logs. e.g., 30d, 7d.
+  sync-log-retention-time: "30d"
+  # 历史记录保留的最大版本数
+  # Maximum number of history versions to keep
+  history-keep-versions: 100
+  # 历史记录保存延迟。支持格式: 10s, 1m。
+  # delay for saving history records. Supports: 10s, 1m.
+  history-save-delay: "10s"
+  # 文件上传会话超时时长
+  # Timeout duration for file upload sessions
+  upload-session-timeout: "1d"
+  # 文件上传/下载的分块大小。例如: 512KB, 1MB
+  # Chunk size for file upload/download. e.g., 512KB, 1MB
+  file-chunk-size: "512KB"
+  # 文件分片下载超时时长
+  # Timeout duration for file chunk downloading
+  download-session-timeout: "1h"
+  # 串行下载同步的分块数量
+  # Serial download sync page chunk size
+  sync-down-chunk-num: 200
+  # 串行上传同步的分包大小
+  # Serial upload sync batch size
+  sync-up-chunk-num: 100
+  # 上行同步流水线窗口大小（0 = 禁用窗口，退回逐批 stop-and-wait，作为运行时回滚开关）
+  # Upload sync pipeline window size (0 = disable window, fall back to per-batch stop-and-wait; runtime rollback switch)
+  pipeline-window-up: 8
+  # 下行同步流水线窗口大小（0 = 禁用窗口，退回逐页 stop-and-wait，作为运行时回滚开关）
+  # Download sync pipeline window size (0 = disable window, fall back to per-page stop-and-wait; runtime rollback switch)
+  pipeline-window-down: 4
+  # Worker Pool 最大工作协程数
+  # Worker Pool maximum number of worker goroutines
+  worker-pool-max-workers: 100
+  # Worker Pool 任务队列大小
+  # Worker Pool task queue capacity
+  worker-pool-queue-size: 1000
+  # 写入队列容量 (每个用户)
+  # Write queue capacity (per user)
+  write-queue-capacity: 1000
+  # 写入队列操作超时时长
+  # Timeout duration for write queue operations
+  write-queue-timeout: "30s"
+  # 写入队列空闲清理时长
+  # Idle cleanup duration for write queue
+  write-queue-idle-time: "10m"
+  # WebSocket 读取最大负载大小。例如: 128MB
+  # WebSocket maximum read payload size. e.g., 128MB
+  ws-read-max-payload-size: "128MB"
+  # WebSocket 写入最大负载大小。例如: 128MB
+  # WebSocket maximum write payload size. e.g., 128MB
+  ws-write-max-payload-size: "128MB"
+  # 是否开启 WebSocket 并行处理
+  # Whether to enable WebSocket parallel processing
+  ws-parallel-enabled: true
+  # WebSocket 并行处理的最大协程限制
+  # Maximum goroutine limit for WebSocket parallel processing
+  ws-parallel-golimit: 5
+  # 是否对 WebSocket 消息进行 UTF-8 校验
+  # Whether to perform UTF-8 validation on WebSocket messages
+  ws-check-utf8-enabled: true
+  # 是否开启 WebSocket 消息压缩
+  # Whether to enable WebSocket message compression
+  ws-compression-enabled: true
+  # WebSocket 压缩级别 (1-9)
+  # WebSocket compression level (1-9)
+  ws-compression-level: 1
+  # 触发 WebSocket 压缩的最小载荷大小(字节)
+  # Minimum payload size (bytes) to trigger WebSocket compression
+  ws-compression-threshold: 512
+  # WebSocket 应用层写超时(秒)，防止僵尸连接阻塞写入；显式设为 0 表示不设超时
+  # WebSocket application-layer write timeout (seconds); guards against zombie connections blocking writes. Explicit 0 disables the deadline
+  ws-write-timeout: 10
+
+  # 数据拉取源设置: auto(自动检测) | github | cnb
+  # Data pull source setting: auto(detect) | github | cnb
+  pull-source: auto
+
+  # 是否启用 Bleve 全文搜索。
+  # true (默认): 启用 Bleve 全文搜索，支持 searchMode=content 检索。
+  # false: 禁用 Bleve 全文搜索，检索退回到普通数据库模糊匹配。
+  # Whether to enable Bleve Full-Text Search (default true).
+  fts-bleve-enabled: true
+
+  # Bleve 全文搜索是否在索引中存储原始文本。
+  # true (方案 B): 既索引又存储原始内容，支持高亮预览，体积稍大。
+  # false (方案 A): 仅索引不存储原始内容，节省磁盘空间。
+  # Whether Bleve stores raw content (default true). If false, it only indexes it without storing.
+  fts-bleve-store-raw: false
+
+security:
+  # 认证令牌加密混淆 Key
+  # Internal key for auth token encryption and obfuscation
+  auth-token-key: fast-note-sync-Auth-Token
+  # 认证令牌过期时间。例如: 365d, 7d, 24h
+  # Expiry duration for authentication tokens. e.g., 365d, 7d, 24h
+  token-expiry: "365d"
+  # 分享令牌加密混淆 Key
+  # Internal key for share token encryption and obfuscation
+  share-token-key: fns
+  # 分享令牌过期时间。例如: 30d, 7d
+  # Expiry duration for share tokens. e.g., 30d, 7d
+  share-token-expiry: "30d"
+  # WebGUI 登录自动签发 Token 的有效期。例如: 7d, 30d, 24h
+  # Expiry duration for WebGUI auto-issued login tokens. e.g., 7d, 30d, 24h
+  webgui-login-token-expiry: "7d"
+  # WebGUI 登录 Token 是否绑定客户端 IP。
+  # 使用 Cloudflare Tunnel 时可关闭（false），避免因 IP 变化频繁掉线。
+  # Whether to bind client IP for WebGUI login tokens.
+  # Set to false when using Cloudflare Tunnel to avoid disconnection due to IP changes.
+  webgui-login-token-bind-ip: true
+
+# 主数据库配置
+# Main database configuration
+database:
+  # 数据库类型: sqlite | mysql | postgres
+  # Database type: sqlite | mysql | postgres
+  type: sqlite
+  # 数据库文件路径 (针对 sqlite)
+  # Database file path (for sqlite)
+  path: storage/database/db.sqlite3
+  # 数据库连接地址 (针对 mysql/postgres)
+  # Database host (for mysql/postgres)
+  host:
+  # 数据库端口 (针对 mysql/postgres)
+  # Database port (for mysql/postgres)
+  port:
+  # 数据库登录用户名
+  # Database login username
+  username:
+  # 数据库登录密码
+  # Database login password
+  password: ""
+  # 数据库名称
+  # Database name
+  name:
+  # SSL 模式 (仅限 postgres)
+  # SSL mode (postgres only)
+  ssl-mode:
+  # 数据库表前缀
+  # Prefix for all database tables
+  table-prefix: ""
+  # 数据库 Schema (仅限 postgres)
+  # Database schema (postgres only)
+  schema:
+  # 是否开启自动数据库迁移
+  # Whether to enable automatic database migration
+  auto-migrate: true
+  # 数据库字符集 (默认 utf8mb4)
+  # Database charset (default utf8mb4)
+  charset:
+  # 是否解析时间字段 (针对 mysql)
+  # Whether to parse time fields (for mysql)
+  parse-time: true
+  # 数据库连接池最大打开连接数
+  # Maximum number of open connections in the pool
+  max-open-conns: 100
+  # 数据库连接池最大空闲连接数
+  # Maximum number of idle connections in the pool
+  max-idle-conns: 10
+  # 连接最大可重用时长
+  # Maximum duration a connection can be reused
+  conn-max-lifetime: "30m"
+  # 连接处于空闲状态的最大时长
+  # Maximum duration a connection can remain idle
+  conn-max-idle-time: "10m"
+  # 是否启用数据库异步写入队列
+  # Whether to enable asynchronous database write queue
+  enable-write-queue: true
+  # 最大并发写入数限制 (当 enable-write-queue 为 false 时)
+  # Maximum concurrent write operations limit (when enable-write-queue is false)
+  max-write-concurrency: 0
+
+# 用户隔离数据库设置, 如果不设置(Type设置为空), 则使用主数据库
+# User isolation database settings, if not set(Type is empty), use the main database
+user-database:
+  # 数据库类型: sqlite | mysql | postgres
+  # Database type: sqlite | mysql | postgres
+  type:
+  # 数据库文件路径 (针对 sqlite)
+  # Database file path (for sqlite)
+  path:
+  # 数据库连接地址 (针对 mysql/postgres)
+  # Database host (for mysql/postgres)
+  host:
+  # 数据库端口 (针对 mysql/postgres)
+  # Database port (for mysql/postgres)
+  port:
+  # 数据库登录用户名
+  # Database login username
+  username:
+  # 数据库登录密码
+  # Database login password
+  password: ""
+  # 数据库名称
+  # Database name
+  name:
+  # SSL 模式 (仅限 postgres)
+  # SSL mode (postgres only)
+  ssl-mode:
+  # 数据库表前缀
+  # Prefix for all database tables
+  table-prefix: ""
+  # 数据库 Schema (仅限 postgres)
+  # Database schema (postgres only)
+  schema: public
+  # 是否开启自动数据库迁移
+  # Whether to enable automatic database migration
+  auto-migrate: true
+  # 数据库字符集 (默认 utf8mb4)
+  # Database charset (default utf8mb4)
+  charset:
+  # 是否解析时间字段 (针对 mysql)
+  # Whether to parse time fields (for mysql)
+  parse-time: true
+  # 数据库连接池最大打开连接数
+  # Maximum number of open connections in the pool
+  max-open-conns: 100
+  # 数据库连接池最大空闲连接数
+  # Maximum number of idle connections in the pool
+  max-idle-conns: 10
+  # 连接最大可重用时长
+  # Maximum duration a connection can be reused
+  conn-max-lifetime: "30m"
+  # 连接处于空闲状态的最大时长
+  # Maximum duration a connection can remain idle
+  conn-max-idle-time: "10m"
+  # 是否启用数据库异步写入队列
+  # Whether to enable asynchronous database write queue
+  enable-write-queue: true
+  # 最大并发写入数限制 (当 enable-write-queue 为 false 时)
+  # Maximum concurrent write operations limit (when enable-write-queue is false)
+  max-write-concurrency: 0
+
+log:
+  # 日志级别: debug | info | warn | error
+  # Log level: debug | info | warn | error
+  level: warn
+  # 日志输出文件路径
+  # File path for log output
+  file: storage/logs/log.log
+  # 是否为生产环境 (开启后使用 JSON 格式输出)
+  # Whether this is a production environment (uses JSON output if true)
+  production: true
+
+user:
+  # 是否开启用户注册功能
+  # Whether to enable user registration
+  register-is-enable: true
+  # 管理员 UID。0 表示任何用户都不能作为超级管理员或是未指定。
+  # Administrator UID. 0 means no user is designated or restricted.
+  admin-uid: 0
+
+tracer:
+  # 是否开启请求链路追踪
+  # Whether to enable request tracing
+  enabled: true
+  # 请求头中的 Trace ID 字段名
+  # Header name for the Trace ID
+  header: "X-Trace-ID"
+
+short-link:
+  # 短链服务的基础 URL
+  # Base URL of the short link service
+  base-url: "https://sink.cool"
+  # 短链服务的 API Key
+  # API Key for the short link service
+  api-key: "SinkCool"
+  # 短链服务的访问密码 (可选)
+  # Access password for the short link service (optional)
+  password: ""
+  # 是否开启短链隐藏重定向 (Cloaking)
+  # Whether to enable short link URL cloaking
+  cloaking: false
+
+storage:
+  local-fs:
+    # 是否启用本地文件系统存储
+    # Whether to enable local file system storage
+    is-enable: true
+    # 是否启用 HTTP 文件服务 (用于提供文件的 HTTP 直接访问)
+    # Whether to enable HTTP file server for direct access
+    httpfs-is-enable: false
+    # 文件保存路径
+    # Directory path for saved files
+    save-path: "storage/uploads"
+  aliyun-oss:
+    # 是否启用 阿里云 OSS 存储
+    # Whether to enable Aliyun OSS storage
+    is-enable: true
+  aws-s3:
+    # 是否启用 AWS S3 存储
+    # Whether to enable AWS S3 storage
+    is-enable: true
+  cloudflare-r2:
+    # 是否启用 Cloudflare R2 存储
+    # Whether to enable Cloudflare R2 storage
+    is-enable: true
+  minio:
+    # 是否启用 MinIO 存储
+    # Whether to enable MinIO storage
+    is-enable: true
+  webdav:
+    # 是否启用 WebDAV 存储
+    # Whether to enable WebDAV storage
+    is-enable: true
+
+git:
+  # Git 提交记录中的作者名称
+  # Author name used in git commits
+  name: "FNS Service"
+  # Git 提交记录中的作者邮箱
+  # Author email used in git commits
+  email: "fns@email.com"
+
+webgui:
+  # Web 界面字体设置。留空使用默认，"local" 使用本地字体，或填入字体链接。
+  # Web GUI font settings. Leave blank for default, "local" for local fonts, or a font URL.
+  font-set: "local"
+
+
+
+cloudflare:
+  # 是否启用 Cloudflare Tunnel (穿透)
+  # Whether to enable Cloudflare Tunnel
+  enabled: false
+  # Cloudflare Tunnel 访问令牌 (Token)
+  # Cloudflare Tunnel access token
+  token: ""
+  # 是否开启 Cloudflare 隧道相关的详细日志
+  # Whether to enable detailed logs for Cloudflare Tunnel
+  log-enabled: false
+
+# OAuth 2.0 / OIDC 集成与认证服务配置
+# OAuth 2.0 / OIDC integration and authentication server configuration
+oauth:
+  # 是否开启 OAuth 认证
+  # Whether to enable OAuth authentication
+  enabled: false
+  # 受保护的资源标识（例如 https://api.fastnotesync.com/）
+  # Protected resource identifier (e.g., https://api.fastnotesync.com/)
+  resource: ""
+  # OAuth 授权服务端地址列表
+  # List of OAuth authorization servers
+  authorization-servers: []
+  # JWKS (JSON Web Key Set) 的 URL 地址，用于拉取公钥验证 JWT 签名
+  # JWKS URL to fetch public keys for token signature validation
+  jwks-url: ""
+  # 令牌签发者 (Issuer) 标识
+  # Token issuer identifier
+  issuer: ""
+  # 令牌允许受众 (Audience) 列表
+  # List of allowed audiences for the token
+  audience: []
+  # 支持的作用域 (Scope) 列表
+  # Supported scope list
+  scopes-supported: []
+  # 必需的作用域 (Scope) 列表
+  # Required scope list
+  required-scopes: []
+  # 受保护资源的名称
+  # Name of the protected resource
+  resource-name: ""
+  # 是否允许使用静态的 FNS 令牌进行认证
+  # Whether to allow authentication using static FNS tokens
+  allow-static-fns-token: true
+  # 默认的客户端标识
+  # Default client identifier
+  default-client: "ChatGPT"
+  # 默认的客户端名称
+  # Default client name
+  default-client-name: "ChatGPT"
+  # 默认客户端的版本号
+  # Default client version
+  default-client-version: ""
+  # 映射默认的主笔记库 (Vault) 名称
+  # Default vault name to map
+  default-vault-name: ""
+  # 默认的 FNS 权限作用域范围
+  # Default FNS scope
+  default-fns-scope: ""
+  # 用户标识映射配置
+  # User mapping and subject configuration
+  subject-mapping:
+    # 映射模式: email (按邮箱匹配) | fixed_uid (映射到固定 UID) | email_or_fixed_uid (按邮箱匹配，失败则回退到固定 UID)
+    # Mapping mode: email | fixed_uid | email_or_fixed_uid
+    mode: "email_or_fixed_uid"
+    # JWT Claim 中提取邮箱的字段属性名。默认: "email"
+    # Claim name for email mapping. Default: "email"
+    claim: "email"
+    # 当使用 fixed_uid 模式时，指定映射的目标用户 UID
+    # Target User UID when using fixed_uid mapping
+    fixed-uid: 0
+  # Stytch 第三方身份认证托管服务配置
+  # Stytch third-party identity service configuration
+  stytch:
+    # 是否启用 Stytch 服务
+    # Whether to enable Stytch
+    enabled: false
+    # Stytch 类型: consumer (消费者) | b2b (企业级)
+    # Stytch kind: consumer | b2b
+    kind: "consumer"
+    # Stytch 认证服务网关域名
+    # Stytch domain URL
+    domain: ""
+    # Stytch 项目 ID
+    # Stytch Project ID
+    project-id: ""
+    # Stytch 密钥
+    # Stytch Secret
+    secret: ""
+    # 默认的用户识别 ID
+    # Stytch user ID
+    user-id: ""
+    # 自动创建用户的前缀，默认 fns:
+    # User ID prefix (default fns:)
+    user-id-prefix: "fns:"
+    # B2B 组织机构 ID
+    # B2B Organization ID
+    organization-id: ""
+    # B2B 成员 ID
+    # B2B Member ID
+    member-id: ""
+
+# 附件模拟静态访问配置 (免 Token 静态入口，主要提供给 nginx 访问)
+# Attachment mock static access configuration (No token static entry, mainly for nginx)
+# 静态资源地址示例 http://localhost:9000/attachments/1/test/demo.pdf
+# Static Resource URL Example http://localhost:9000/attachments/1/test/demo.pdf
+attachment-static:
+  # 是否开启该模拟静态入口
+  # Whether to enable the mock static entry
+  is-enable: false
+  # 允许访问的用户和笔记库，必须强制设置，否则不开启模拟访问
+  # Allowed users and vaults, must be set, otherwise static access is disabled
+  # 格式为 "uid": [vault1, vault2]
+  # Format: "uid": [vault1, vault2]
+  allowed-vaults:
+    # "1": ["notes", "work"]
+  # 允许访问的文件后缀类型，必须强制设置，否则不开启模拟访问
+  # Allowed file extensions, must be set, otherwise static access is disabled
+  allowed-types:
+    # - ".png"
+    # - ".jpg"
+    # - ".jpeg"
+    # - ".gif"
+    # - ".pdf"

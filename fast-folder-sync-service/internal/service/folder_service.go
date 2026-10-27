@@ -1,0 +1,1015 @@
+package service
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"sort"
+	"strings"
+	"time"
+
+	"github.com/haierkeys/fast-note-sync-service/internal/domain"
+	"github.com/haierkeys/fast-note-sync-service/internal/dto"
+	"github.com/haierkeys/fast-note-sync-service/pkg/app"
+	"github.com/haierkeys/fast-note-sync-service/pkg/code"
+	"github.com/haierkeys/fast-note-sync-service/pkg/timex"
+	"github.com/haierkeys/fast-note-sync-service/pkg/util"
+	"github.com/haierkeys/fast-note-sync-service/pkg/workerpool"
+	"golang.org/x/sync/singleflight"
+	"gorm.io/gorm"
+)
+
+// FolderService 文件夹业务服务接口
+type FolderService interface {
+	Get(ctx context.Context, uid int64, params *dto.FolderGetRequest) (*dto.FolderDTO, error)
+	List(ctx context.Context, uid int64, params *dto.FolderListRequest) ([]*dto.FolderDTO, error)
+	ListByUpdatedTimestamp(ctx context.Context, uid int64, vault string, lastTime int64) ([]*dto.FolderDTO, error)
+	UpdateOrCreate(ctx context.Context, uid int64, params *dto.FolderCreateRequest) (*dto.FolderDTO, error)
+	Delete(ctx context.Context, uid int64, params *dto.FolderDeleteRequest) (*dto.FolderDTO, error)
+	DeleteTree(ctx context.Context, uid int64, params *dto.FolderDeleteRequest) (*dto.FolderDTO, error)
+	Rename(ctx context.Context, uid int64, params *dto.FolderRenameRequest) (*dto.FolderDTO, *dto.FolderDTO, error)
+	ListNotes(ctx context.Context, uid int64, params *dto.FolderContentRequest, pager *app.Pager) ([]*dto.NoteNoContentDTO, int, error)
+	ListFiles(ctx context.Context, uid int64, params *dto.FolderContentRequest, pager *app.Pager) ([]*dto.FileDTO, int, error)
+	EnsurePathFID(ctx context.Context, uid int64, vaultID int64, path string) (int64, error)
+	CleanupEmptyAncestors(ctx context.Context, uid int64, vaultID int64, resourcePath string) error
+	SyncResourceFID(ctx context.Context, uid int64, vaultID int64, noteIDs []int64, fileIDs []int64) error
+	GetTree(ctx context.Context, uid int64, params *dto.FolderTreeRequest) (*dto.FolderTreeResponse, error)
+	CleanDuplicateFolders(ctx context.Context, uid int64, vaultID int64) error
+	WithClient(clientType, clientName, clientVersion string) FolderService
+}
+
+type folderService struct {
+	folderRepo     domain.FolderRepository
+	noteRepo       domain.NoteRepository
+	fileRepo       domain.FileRepository
+	vaultService   VaultService
+	sf             *singleflight.Group // Singleflight group for concurrency control // 用于并发控制的 Singleflight 组
+	backupService  BackupService
+	gitSyncService GitSyncService
+	pool           *workerpool.Pool
+	syncLogService SyncLogService
+	clientType     string
+	clientName     string
+	clientVersion  string
+}
+
+func NewFolderService(folderRepo domain.FolderRepository, noteRepo domain.NoteRepository, fileRepo domain.FileRepository, vaultSvc VaultService, backupSvc BackupService, gitSyncSvc GitSyncService, syncLogSvc SyncLogService, pool *workerpool.Pool) FolderService {
+	return &folderService{
+		folderRepo:     folderRepo,
+		noteRepo:       noteRepo,
+		fileRepo:       fileRepo,
+		vaultService:   vaultSvc,
+		backupService:  backupSvc,
+		gitSyncService: gitSyncSvc,
+		syncLogService: syncLogSvc,
+		pool:           pool,
+		sf:             &singleflight.Group{},
+	}
+}
+
+func (s *folderService) domainToDTO(f *domain.Folder) *dto.FolderDTO {
+	if f == nil {
+		return nil
+	}
+	return &dto.FolderDTO{
+		ID:               f.ID,
+		Action:           string(f.Action),
+		Path:             f.Path,
+		PathHash:         f.PathHash,
+		Level:            f.Level,
+		FID:              f.FID,
+		Ctime:            f.Ctime,
+		Mtime:            f.Mtime,
+		UpdatedTimestamp: f.UpdatedTimestamp,
+		UpdatedAt:        timex.Time(f.UpdatedAt),
+		CreatedAt:        timex.Time(f.CreatedAt),
+	}
+}
+
+func (s *folderService) WithClient(clientType, clientName, clientVersion string) FolderService {
+	ns := *s
+	ns.clientType = clientType
+	ns.clientName = clientName
+	ns.clientVersion = clientVersion
+	return &ns
+}
+
+func (s *folderService) List(ctx context.Context, uid int64, params *dto.FolderListRequest) ([]*dto.FolderDTO, error) {
+	vaultID, err := s.vaultService.MustGetID(ctx, uid, params.Vault)
+	if err != nil {
+		return nil, err
+	}
+
+	if params.Path != strings.Trim(params.Path, "/") && params.Path != "" {
+		return nil, code.ErrorInvalidParams.WithDetails("path cannot be empty")
+	}
+
+	var fid int64 = 0
+	if params.Path != "" {
+		if params.PathHash == "" {
+			params.PathHash = util.EncodeHash32(params.Path)
+		}
+		f, err := s.folderRepo.GetByPathHash(ctx, params.PathHash, vaultID, uid)
+		if err == nil {
+			fid = f.ID
+		}
+	}
+
+	folders, err := s.folderRepo.GetByFID(ctx, fid, vaultID, uid)
+	if err != nil {
+		return nil, code.ErrorDBQuery.WithDetails(err.Error())
+	}
+
+	var res []*dto.FolderDTO
+	for _, f := range folders {
+		res = append(res, s.domainToDTO(f))
+	}
+	return res, nil
+}
+
+func (s *folderService) UpdateOrCreate(ctx context.Context, uid int64, params *dto.FolderCreateRequest) (*dto.FolderDTO, error) {
+	vaultID, err := s.vaultService.MustGetID(ctx, uid, params.Vault)
+	if err != nil {
+		return nil, err
+	}
+
+	if params.Path != strings.Trim(params.Path, "/") && params.Path != "" {
+		return nil, code.ErrorInvalidParams.WithDetails("path cannot be empty")
+	}
+
+	if params.PathHash == "" {
+		params.PathHash = util.EncodeHash32(params.Path)
+	}
+
+	// Unified call to EnsurePathFID
+	// 统一调用 EnsurePathFID
+	fid, err := s.EnsurePathFID(ctx, uid, vaultID, params.Path)
+	if err != nil {
+		return nil, code.ErrorFolderModifyOrCreateFailed.WithDetails(err.Error())
+	}
+
+	f, err := s.folderRepo.GetByID(ctx, fid, uid)
+	if err != nil {
+		return nil, code.ErrorDBQuery.WithDetails(err.Error())
+	}
+
+	if s.backupService != nil {
+		s.backupService.NotifyUpdated(uid)
+	}
+
+	if s.syncLogService != nil {
+		s.syncLogService.Log(uid, vaultID, domain.SyncLogTypeFolder, domain.SyncLogActionCreate, "", f.Path, f.PathHash, s.clientType, s.clientName, s.clientVersion, 0)
+	}
+
+	return s.domainToDTO(f), nil
+}
+
+func (s *folderService) Delete(ctx context.Context, uid int64, params *dto.FolderDeleteRequest) (*dto.FolderDTO, error) {
+	// Use VaultService.MustGetID to retrieve VaultID // 使用 VaultService.MustGetID 获取 VaultID
+	vaultID, err := s.vaultService.MustGetID(ctx, uid, params.Vault)
+	if err != nil {
+		return nil, err
+	}
+
+	if params.Path != strings.Trim(params.Path, "/") && params.Path != "" {
+		return nil, code.ErrorInvalidParams.WithDetails("path cannot be empty")
+	}
+
+	if params.PathHash == "" {
+		params.PathHash = util.EncodeHash32(params.Path)
+	}
+
+	f, err := s.folderRepo.GetByPathHash(ctx, params.PathHash, vaultID, uid)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, code.ErrorFolderNotFound
+		}
+		return nil, code.ErrorFolderGetFailed.WithDetails(err.Error())
+	}
+
+	// Update to deleted status
+	// 更新为删除状态
+	f.Action = domain.FolderActionDelete
+	f.UpdatedTimestamp = time.Now().UnixMilli()
+	_, err = s.folderRepo.Update(ctx, f, uid)
+	if err != nil {
+		return nil, code.ErrorFolderDeleteFailed.WithDetails(err.Error())
+	}
+
+	if s.backupService != nil {
+		s.backupService.NotifyUpdated(uid)
+	}
+
+	if s.syncLogService != nil {
+		s.syncLogService.Log(uid, vaultID, domain.SyncLogTypeFolder, domain.SyncLogActionDelete, "", f.Path, f.PathHash, s.clientType, s.clientName, s.clientVersion, 0)
+	}
+
+	return s.domainToDTO(f), nil
+}
+
+func (s *folderService) DeleteTree(ctx context.Context, uid int64, params *dto.FolderDeleteRequest) (*dto.FolderDTO, error) {
+	vaultID, err := s.vaultService.MustGetID(ctx, uid, params.Vault)
+	if err != nil {
+		return nil, err
+	}
+
+	params.Path = strings.Trim(params.Path, "/")
+	if params.Path == "" {
+		return nil, code.ErrorInvalidParams.WithDetails("path cannot be empty")
+	}
+	if params.PathHash == "" {
+		params.PathHash = util.EncodeHash32(params.Path)
+	}
+
+	rootFolders, err := s.folderRepo.GetAllByPathHash(ctx, params.PathHash, vaultID, uid)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, code.ErrorFolderNotFound
+		}
+		return nil, code.ErrorFolderGetFailed.WithDetails(err.Error())
+	}
+	if len(rootFolders) == 0 {
+		return nil, code.ErrorFolderNotFound
+	}
+	root := rootFolders[0]
+
+	childFolders, err := s.folderRepo.ListByPathPrefix(ctx, params.Path, vaultID, uid)
+	if err != nil {
+		return nil, code.ErrorFolderListFailed.WithDetails(err.Error())
+	}
+	notes, err := s.noteRepo.ListByPathPrefix(ctx, params.Path, vaultID, uid)
+	if err != nil {
+		return nil, code.ErrorNoteListFailed.WithDetails(err.Error())
+	}
+	files, err := s.fileRepo.ListByPathPrefix(ctx, params.Path, vaultID, uid)
+	if err != nil {
+		return nil, code.ErrorFileListFailed.WithDetails(err.Error())
+	}
+
+	now := timex.Now().UnixMilli()
+	for _, n := range notes {
+		n.Action = domain.NoteActionDelete
+		n.Rename = 0
+		n.UpdatedTimestamp = now
+		if err := s.noteRepo.UpdateDelete(ctx, n, uid); err != nil {
+			return nil, code.ErrorDBQuery.WithDetails(err.Error())
+		}
+		if s.syncLogService != nil {
+			s.syncLogService.Log(uid, vaultID, domain.SyncLogTypeNote, domain.SyncLogActionSoftDelete, "", n.Path, n.PathHash, s.clientType, s.clientName, s.clientVersion, n.Size)
+		}
+	}
+
+	for _, f := range files {
+		f.Action = domain.FileActionDelete
+		f.Rename = 0
+		f.UpdatedTimestamp = now
+		if _, err := s.fileRepo.Update(ctx, f, uid); err != nil {
+			return nil, code.ErrorDBQuery.WithDetails(err.Error())
+		}
+		if s.syncLogService != nil {
+			s.syncLogService.Log(uid, vaultID, domain.SyncLogTypeFile, domain.SyncLogActionSoftDelete, "", f.Path, f.PathHash, s.clientType, s.clientName, s.clientVersion, f.Size)
+		}
+	}
+
+	folders := append([]*domain.Folder{}, childFolders...)
+	sort.SliceStable(folders, func(i, j int) bool {
+		return strings.Count(folders[i].Path, "/") > strings.Count(folders[j].Path, "/")
+	})
+	folders = append(folders, rootFolders...)
+	for _, f := range folders {
+		if f.Action == domain.FolderActionDelete {
+			continue
+		}
+		f.Action = domain.FolderActionDelete
+		f.UpdatedTimestamp = now
+		if _, err := s.folderRepo.Update(ctx, f, uid); err != nil {
+			return nil, code.ErrorFolderDeleteFailed.WithDetails(err.Error())
+		}
+		if s.syncLogService != nil {
+			s.syncLogService.Log(uid, vaultID, domain.SyncLogTypeFolder, domain.SyncLogActionDelete, "", f.Path, f.PathHash, s.clientType, s.clientName, s.clientVersion, 0)
+		}
+	}
+
+	if s.backupService != nil {
+		s.backupService.NotifyUpdated(uid)
+	}
+	if s.gitSyncService != nil && (len(notes) > 0 || len(files) > 0) {
+		s.gitSyncService.NotifyUpdated(uid, vaultID)
+	}
+	return s.domainToDTO(root), nil
+}
+
+func (s *folderService) ListByUpdatedTimestamp(ctx context.Context, uid int64, vault string, lastTime int64) ([]*dto.FolderDTO, error) {
+	// Use VaultService.MustGetID to retrieve VaultID // 使用 VaultService.MustGetID 获取 VaultID
+	vaultID, err := s.vaultService.MustGetID(ctx, uid, vault)
+	if err != nil {
+		return nil, err
+	}
+
+	folders, err := s.folderRepo.ListByUpdatedTimestamp(ctx, lastTime, vaultID, uid)
+	if err != nil {
+		return nil, code.ErrorFolderListFailed.WithDetails(err.Error())
+	}
+
+	var res []*dto.FolderDTO
+	cache := make(map[string]bool)
+	for _, f := range folders {
+		if cache[f.PathHash] {
+			continue
+		}
+		res = append(res, s.domainToDTO(f))
+		cache[f.PathHash] = true
+	}
+
+	return res, nil
+}
+
+func (s *folderService) Rename(ctx context.Context, uid int64, params *dto.FolderRenameRequest) (*dto.FolderDTO, *dto.FolderDTO, error) {
+	vaultID, err := s.vaultService.MustGetID(ctx, uid, params.Vault)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if params.Path != strings.Trim(params.Path, "/") && params.Path != "" {
+		return nil, nil, code.ErrorInvalidParams.WithDetails("path cannot be empty")
+	}
+
+	if params.OldPath != strings.Trim(params.OldPath, "/") && params.OldPath != "" {
+		return nil, nil, code.ErrorInvalidParams.WithDetails("oldPath cannot be empty")
+	}
+
+	if params.PathHash == "" {
+		params.PathHash = util.EncodeHash32(params.Path)
+	}
+
+	if params.OldPathHash == "" {
+		params.OldPathHash = util.EncodeHash32(params.OldPath)
+	}
+
+	// Rename renames a folder
+	// Rename 重命名文件夹
+	oldFolder, err := s.folderRepo.GetByPathHash(ctx, params.OldPathHash, vaultID, uid)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			newFolder, err := s.UpdateOrCreate(ctx, uid, &dto.FolderCreateRequest{
+				Path:     params.Path,
+				PathHash: params.PathHash,
+				Vault:    params.Vault,
+			})
+			if err != nil {
+				return nil, nil, err
+			}
+			return nil, newFolder, nil
+		}
+		return nil, nil, code.ErrorFolderGetFailed.WithDetails(params.OldPathHash + "->" + params.PathHash + ":" + err.Error())
+	}
+
+	// 1. Check if target path has valid folder
+	// 1. 判断目标路径是否存在有效文件夹
+	existFolder, _ := s.folderRepo.GetByPathHash(ctx, params.PathHash, vaultID, uid)
+	if existFolder != nil && existFolder.Action != domain.FolderActionDelete {
+		newFolder, err := s.Delete(ctx, uid, &dto.FolderDeleteRequest{
+			Path:     params.OldPath,
+			PathHash: params.OldPathHash,
+			Vault:    params.Vault,
+		})
+		if err != nil {
+			return nil, nil, err
+		}
+		return s.domainToDTO(oldFolder), newFolder, nil
+	}
+
+	// 3. Mark old folder as deleted
+	// 3. 标记旧文件夹删除
+	oldFolder.Action = domain.FolderActionDelete
+	oldFolder.UpdatedTimestamp = timex.Now().UnixMilli()
+	oldFolder, err = s.folderRepo.Update(ctx, oldFolder, uid)
+	if err != nil {
+		return nil, nil, code.ErrorFolderRenameFailed.WithDetails(err.Error())
+	}
+
+	// 4. New or reuse folder record
+	// 4. 新建或复用文件夹记录
+	// 统一调用 EnsurePathFID
+	fid, err := s.EnsurePathFID(ctx, uid, vaultID, params.Path)
+	if err != nil {
+		return nil, nil, code.ErrorDBQuery.WithDetails(err.Error())
+	}
+
+	newFolderCreated, err := s.folderRepo.GetByID(ctx, fid, uid)
+	if err != nil {
+		return nil, nil, code.ErrorDBQuery.WithDetails(err.Error())
+	}
+
+	if s.backupService != nil {
+		s.backupService.NotifyUpdated(uid)
+	}
+
+	if s.syncLogService != nil {
+		s.syncLogService.Log(uid, vaultID, domain.SyncLogTypeFolder, domain.SyncLogActionRename, "path", newFolderCreated.Path, newFolderCreated.PathHash, s.clientType, s.clientName, s.clientVersion, 0)
+	}
+
+	return s.domainToDTO(oldFolder), s.domainToDTO(newFolderCreated), nil
+}
+
+func (s *folderService) Get(ctx context.Context, uid int64, params *dto.FolderGetRequest) (*dto.FolderDTO, error) {
+	vaultID, err := s.vaultService.MustGetID(ctx, uid, params.Vault)
+	if err != nil {
+		return nil, err
+	}
+
+	if params.Path != strings.Trim(params.Path, "/") && params.Path != "" {
+		return nil, code.ErrorInvalidParams.WithDetails("path cannot be empty")
+	}
+
+	if params.Path != "" && params.PathHash == "" {
+		params.PathHash = util.EncodeHash32(params.Path)
+	}
+
+	if params.PathHash == "" {
+		return nil, code.ErrorInvalidParams.WithDetails("path or pathHash is required")
+	}
+
+	f, err := s.folderRepo.GetByPathHash(ctx, params.PathHash, vaultID, uid)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, code.ErrorFolderNotFound
+		}
+		return nil, code.ErrorFolderGetFailed.WithDetails(err.Error())
+	}
+
+	return s.domainToDTO(f), nil
+}
+
+func (s *folderService) ListNotes(ctx context.Context, uid int64, params *dto.FolderContentRequest, pager *app.Pager) ([]*dto.NoteNoContentDTO, int, error) {
+	vaultID, err := s.vaultService.MustGetID(ctx, uid, params.Vault)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if params.Path != strings.Trim(params.Path, "/") && params.Path != "" {
+		return nil, 0, code.ErrorInvalidParams.WithDetails("path cannot be empty")
+	}
+
+	var fid int64 = 0
+	if params.Path != "" {
+		if params.PathHash == "" {
+			params.PathHash = util.EncodeHash32(params.Path)
+		}
+		f, err := s.folderRepo.GetByPathHash(ctx, params.PathHash, vaultID, uid)
+		if err == nil {
+			fid = f.ID
+		}
+	}
+
+	notes, err := s.noteRepo.ListByFID(ctx, fid, vaultID, uid, pager.Page, pager.PageSize, params.SortBy, params.SortOrder)
+	if err != nil {
+		return nil, 0, code.ErrorNoteListFailed.WithDetails(err.Error())
+	}
+
+	count, err := s.noteRepo.ListByFIDCount(ctx, fid, vaultID, uid)
+	if err != nil {
+		return nil, 0, code.ErrorNoteListFailed.WithDetails(err.Error())
+	}
+
+	var res []*dto.NoteNoContentDTO
+	for _, n := range notes {
+		res = append(res, &dto.NoteNoContentDTO{
+			ID:               n.ID,
+			Action:           string(n.Action),
+			Path:             n.Path,
+			PathHash:         n.PathHash,
+			Version:          n.Version,
+			Ctime:            n.Ctime,
+			Mtime:            n.Mtime,
+			UpdatedTimestamp: n.UpdatedTimestamp,
+			UpdatedAt:        timex.Time(n.UpdatedAt),
+			CreatedAt:        timex.Time(n.CreatedAt),
+		})
+	}
+	return res, int(count), nil
+}
+
+func (s *folderService) ListFiles(ctx context.Context, uid int64, params *dto.FolderContentRequest, pager *app.Pager) ([]*dto.FileDTO, int, error) {
+	vaultID, err := s.vaultService.MustGetID(ctx, uid, params.Vault)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if params.Path != strings.Trim(params.Path, "/") && params.Path != "" {
+		return nil, 0, code.ErrorInvalidParams.WithDetails("path cannot be empty")
+	}
+
+	var fid int64 = 0
+	if params.Path != "" {
+		if params.PathHash == "" {
+			params.PathHash = util.EncodeHash32(params.Path)
+		}
+		f, err := s.folderRepo.GetByPathHash(ctx, params.PathHash, vaultID, uid)
+		if err == nil {
+			fid = f.ID
+		}
+	}
+
+	files, err := s.fileRepo.ListByFID(ctx, fid, vaultID, uid, pager.Page, pager.PageSize, params.SortBy, params.SortOrder)
+	if err != nil {
+		return nil, 0, code.ErrorFileListFailed.WithDetails(err.Error())
+	}
+
+	count, err := s.fileRepo.ListByFIDCount(ctx, fid, vaultID, uid)
+	if err != nil {
+		return nil, 0, code.ErrorFileListFailed.WithDetails(err.Error())
+	}
+
+	var res []*dto.FileDTO
+	for _, f := range files {
+		res = append(res, &dto.FileDTO{
+			ID:               f.ID,
+			Action:           string(f.Action),
+			Path:             f.Path,
+			PathHash:         f.PathHash,
+			ContentHash:      f.ContentHash,
+			SavePath:         f.SavePath,
+			Size:             f.Size,
+			Ctime:            f.Ctime,
+			Mtime:            f.Mtime,
+			UpdatedTimestamp: f.UpdatedTimestamp,
+			UpdatedAt:        timex.Time(f.UpdatedAt),
+			CreatedAt:        timex.Time(f.CreatedAt),
+		})
+	}
+	return res, int(count), nil
+}
+
+// EnsurePathFID ensures all folders in path exist and returns the ID of the deepest folder
+// EnsurePathFID 确保路径中的所有文件夹都存在并返回最深文件夹的 ID
+//
+// NOTE: Race condition — when multiple notes sync concurrently (even from a
+// single device), each goroutine calls EnsurePathFID independently. The
+// check-then-create below (GetByPathHash → Create) is not atomic, so two
+// goroutines can both see "not found" and both insert a folder record for the
+// same path. This produces duplicate rows in the folder table (confirmed via
+// direct DB inspection — e.g. 3 rows for "projects" with IDs 4,5,6).
+//
+// The query-side methods (List, ListNotes, ListFiles, GetTree) handle this by
+// resolving all folder IDs per path (GetAllByPathHash + FID IN queries).
+//
+// A proper fix would be to either:
+//   - Use singleflight keyed by (vaultID, path) to coalesce concurrent creates
+//   - Add a UNIQUE constraint on (vault_id, path_hash) and handle conflict
+// ensurePathFIDSingle performs the underlying lookup or creation of a folder.
+// ensurePathFIDSingle 执行底层的文件夹查询或创建。
+func (s *folderService) ensurePathFIDSingle(ctx context.Context, uid int64, vaultID int64, pathHash string, currentPath string, currentFID int64, level int) (any, error) {
+	f, err := s.folderRepo.GetByPathHash(ctx, pathHash, vaultID, uid)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			newFolder := &domain.Folder{
+				VaultID:  vaultID,
+				Action:   domain.FolderActionCreate,
+				Path:     currentPath,
+				PathHash: pathHash,
+				Level:    int64(level + 1),
+				FID:      currentFID,
+				Ctime:    timex.Now().UnixMilli(),
+				Mtime:    timex.Now().UnixMilli(),
+			}
+			f, err = s.folderRepo.Create(ctx, newFolder, uid)
+			if err != nil {
+				return 0, err
+			}
+
+			if s.syncLogService != nil {
+				s.syncLogService.Log(uid, vaultID, domain.SyncLogTypeFolder, domain.SyncLogActionCreate, "", f.Path, f.PathHash, s.clientType, s.clientName, s.clientVersion, 0)
+			}
+			return f.ID, nil
+		}
+		return nil, err
+	} else if f.Action == domain.FolderActionDelete {
+		f.Action = domain.FolderActionCreate
+		f.Ctime = timex.Now().UnixMilli()
+		f.Mtime = timex.Now().UnixMilli()
+		f, err = s.folderRepo.Update(ctx, f, uid)
+		if err != nil {
+			return nil, err
+		}
+
+		if s.syncLogService != nil {
+			s.syncLogService.Log(uid, vaultID, domain.SyncLogTypeFolder, domain.SyncLogActionRestore, "", f.Path, f.PathHash, s.clientType, s.clientName, s.clientVersion, 0)
+		}
+		return f.ID, nil
+	}
+	return f.ID, nil
+}
+
+func (s *folderService) EnsurePathFID(ctx context.Context, uid int64, vaultID int64, path string) (int64, error) {
+	path = strings.Trim(path, "/")
+	if path == "" {
+		return 0, nil
+	}
+
+	// Decompose directory
+	// 分解目录
+	parts := strings.Split(path, "/")
+	var currentFID int64 = 0
+
+	for i := range parts {
+		currentPath := strings.Join(parts[:i+1], "/")
+		pathHash := util.EncodeHash32(currentPath)
+
+		key := fmt.Sprintf("ensure_folder_%d_%d_%s", uid, vaultID, pathHash)
+		var val any
+		var err error
+		if s.sf != nil {
+			var _ bool
+			val, err, _ = s.sf.Do(key, func() (any, error) {
+				return s.ensurePathFIDSingle(ctx, uid, vaultID, pathHash, currentPath, currentFID, i)
+			})
+		} else {
+			val, err = s.ensurePathFIDSingle(ctx, uid, vaultID, pathHash, currentPath, currentFID, i)
+		}
+
+		if err != nil {
+			return 0, err
+		}
+
+		currentFID = val.(int64)
+	}
+	return currentFID, nil
+}
+
+func (s *folderService) CleanupEmptyAncestors(ctx context.Context, uid int64, vaultID int64, resourcePath string) error {
+	path := strings.Trim(resourcePath, "/")
+	if path == "" || !strings.Contains(path, "/") {
+		return nil
+	}
+
+	parent := path[:strings.LastIndex(path, "/")]
+	for parent != "" {
+		pathHash := util.EncodeHash32(parent)
+		folders, err := s.folderRepo.GetAllByPathHash(ctx, pathHash, vaultID, uid)
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil
+			}
+			return code.ErrorFolderGetFailed.WithDetails(err.Error())
+		}
+		if len(folders) == 0 {
+			parent = parentPath(parent)
+			continue
+		}
+
+		ids := make([]int64, 0, len(folders))
+		for _, f := range folders {
+			if f.Action != domain.FolderActionDelete {
+				ids = append(ids, f.ID)
+			}
+		}
+		if len(ids) == 0 {
+			parent = parentPath(parent)
+			continue
+		}
+
+		empty, err := s.folderIDsAreEmpty(ctx, uid, vaultID, ids)
+		if err != nil {
+			return err
+		}
+		if !empty {
+			return nil
+		}
+
+		for _, f := range folders {
+			if f.Action == domain.FolderActionDelete {
+				continue
+			}
+			f.Action = domain.FolderActionDelete
+			f.UpdatedTimestamp = timex.Now().UnixMilli()
+			if _, err := s.folderRepo.Update(ctx, f, uid); err != nil {
+				return code.ErrorFolderDeleteFailed.WithDetails(err.Error())
+			}
+			if s.syncLogService != nil {
+				s.syncLogService.Log(uid, vaultID, domain.SyncLogTypeFolder, domain.SyncLogActionDelete, "", f.Path, f.PathHash, s.clientType, s.clientName, s.clientVersion, 0)
+			}
+		}
+
+		parent = parentPath(parent)
+	}
+	return nil
+}
+
+func (s *folderService) folderIDsAreEmpty(ctx context.Context, uid int64, vaultID int64, ids []int64) (bool, error) {
+	for _, id := range ids {
+		children, err := s.folderRepo.GetByFID(ctx, id, vaultID, uid)
+		if err != nil {
+			return false, code.ErrorFolderListFailed.WithDetails(err.Error())
+		}
+		if len(children) > 0 {
+			return false, nil
+		}
+	}
+
+	noteCount, err := s.noteRepo.ListByFIDsCount(ctx, ids, vaultID, uid)
+	if err != nil {
+		return false, code.ErrorNoteListFailed.WithDetails(err.Error())
+	}
+	if noteCount > 0 {
+		return false, nil
+	}
+
+	fileCount, err := s.fileRepo.ListByFIDsCount(ctx, ids, vaultID, uid)
+	if err != nil {
+		return false, code.ErrorFileListFailed.WithDetails(err.Error())
+	}
+	return fileCount == 0, nil
+}
+
+func parentPath(path string) string {
+	if idx := strings.LastIndex(path, "/"); idx >= 0 {
+		return path[:idx]
+	}
+	return ""
+}
+
+// SyncResourceFID syncs FID of resources (called after folder rename/move)
+// SyncResourceFID 同步资源的 FID（在文件夹重命名/移动后调用）
+func (s *folderService) SyncResourceFID(ctx context.Context, uid int64, vaultID int64, noteIDs []int64, fileIDs []int64) error {
+	// Use pool for async execution to avoid CPU spike // 使用协程池异步执行，避免 CPU 飙升
+	if s.pool != nil {
+		// Create a background context to avoid being cancelled by request context
+		// 使用背景 context 避免被请求 context 取消
+		bgCtx := context.Background()
+		err := s.pool.SubmitAsync(bgCtx, func(c context.Context) error {
+			return s.doSyncResourceFID(c, uid, vaultID, noteIDs, fileIDs)
+		})
+		if err != nil {
+			// Fallback to direct goroutine if pool is full/closed (better than losing consistency)
+			// 如果池满或关闭，则回退到直接协程执行（保底一致性）
+			go s.doSyncResourceFID(context.Background(), uid, vaultID, noteIDs, fileIDs)
+		}
+		return nil
+	}
+
+	// Legacy behavior for safety if pool is not initialized
+	// 如果池未初始化，则保留原逻辑
+	go s.doSyncResourceFID(context.Background(), uid, vaultID, noteIDs, fileIDs)
+	return nil
+}
+
+func (s *folderService) doSyncResourceFID(ctx context.Context, uid int64, vaultID int64, noteIDs []int64, fileIDs []int64) error {
+	// Sync notes
+	// 同步笔记
+	var notes []*domain.Note
+	var err error
+	if len(noteIDs) > 0 {
+		notes, err = s.noteRepo.ListByIDs(ctx, noteIDs, uid)
+	} else if len(noteIDs) == 0 && len(fileIDs) == 0 {
+		// 全量同步
+		notes, err = s.noteRepo.ListByUpdatedTimestamp(ctx, 0, vaultID, uid)
+	}
+
+	if err == nil {
+		for _, n := range notes {
+			// Set action
+			// 设置 action
+			if n.Action == domain.NoteActionDelete {
+				continue
+			}
+			path := strings.Trim(n.Path, "/")
+			if !strings.Contains(path, "/") {
+				if n.FID != 0 {
+					// 仅更新 FID，不更新 updated_timestamp，避免污染增量同步时间戳
+					// Only update FID without touching updated_timestamp to avoid polluting incremental sync timestamps
+					_ = s.noteRepo.UpdateFID(ctx, n.ID, 0, uid)
+				}
+				continue
+			}
+			parentPath := path[:strings.LastIndex(path, "/")]
+			fid, err := s.EnsurePathFID(ctx, uid, vaultID, parentPath)
+			if err == nil && n.FID != fid {
+				// 仅更新 FID，不更新 updated_timestamp，避免污染增量同步时间戳
+				// Only update FID without touching updated_timestamp to avoid polluting incremental sync timestamps
+				_ = s.noteRepo.UpdateFID(ctx, n.ID, fid, uid)
+			}
+		}
+	}
+
+	// Sync files
+	// 同步文件
+	var files []*domain.File
+	if len(fileIDs) > 0 {
+		files, err = s.fileRepo.ListByIDs(ctx, fileIDs, uid)
+	} else if len(noteIDs) == 0 && len(fileIDs) == 0 {
+		// 全量同步
+		files, err = s.fileRepo.ListByUpdatedTimestamp(ctx, 0, vaultID, uid)
+	}
+
+	if err == nil {
+		for _, f := range files {
+			if f.Action == domain.FileActionDelete {
+				continue
+			}
+			path := strings.Trim(f.Path, "/")
+			if !strings.Contains(path, "/") {
+				if f.FID != 0 {
+					// 仅更新 FID，不更新 updated_timestamp，避免污染增量同步时间戳
+					// Only update FID without touching updated_timestamp to avoid polluting incremental sync timestamps
+					_ = s.fileRepo.UpdateFID(ctx, f.ID, 0, uid)
+				}
+				continue
+			}
+			parentPath := f.Path[:strings.LastIndex(f.Path, "/")]
+			fid, err := s.EnsurePathFID(ctx, uid, vaultID, parentPath)
+			if err == nil && f.FID != fid {
+				// 仅更新 FID，不更新 updated_timestamp，避免污染增量同步时间戳
+				// Only update FID without touching updated_timestamp to avoid polluting incremental sync timestamps
+				_ = s.fileRepo.UpdateFID(ctx, f.ID, fid, uid)
+			}
+		}
+	}
+	return nil
+}
+
+// GetTree returns the complete folder tree structure for a vault
+func (s *folderService) GetTree(ctx context.Context, uid int64, params *dto.FolderTreeRequest) (*dto.FolderTreeResponse, error) {
+	vaultID, err := s.vaultService.MustGetID(ctx, uid, params.Vault)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get all non-deleted folders // 获取所有未删除的文件夹
+	folders, err := s.folderRepo.ListByUpdatedTimestamp(ctx, 0, vaultID, uid)
+	if err != nil {
+		return nil, code.ErrorFolderListFailed.WithDetails(err.Error())
+	}
+
+	// Deduplicate by path, collect all IDs per path for counting
+	type folderInfo struct {
+		path   string
+		ids    []int64 // all DB IDs for this path (for counting notes/files)
+		parent string  // parent path ("" for root)
+	}
+	infoByPath := make(map[string]*folderInfo)
+
+	for _, f := range folders {
+		if f.Action == domain.FolderActionDelete {
+			continue
+		}
+		info, exists := infoByPath[f.Path]
+		if !exists {
+			parent := ""
+			if idx := strings.LastIndex(f.Path, "/"); idx >= 0 {
+				parent = f.Path[:idx]
+			}
+			info = &folderInfo{path: f.Path, parent: parent}
+			infoByPath[f.Path] = info
+		}
+		info.ids = append(info.ids, f.ID)
+	}
+
+	// Count notes and files per folder (sum across all duplicate IDs).
+	// 一次性按 fid 分组聚合查询取回全部计数，而非每个文件夹 ID 单独查询两次（N+1）。
+	allFIDs := make([]int64, 0, len(infoByPath))
+	for _, info := range infoByPath {
+		allFIDs = append(allFIDs, info.ids...)
+	}
+
+	noteCountByFID, err := s.noteRepo.CountByFIDs(ctx, allFIDs, vaultID, uid)
+	if err != nil {
+		noteCountByFID = map[int64]int64{}
+	}
+	fileCountByFID, err := s.fileRepo.CountByFIDs(ctx, allFIDs, vaultID, uid)
+	if err != nil {
+		fileCountByFID = map[int64]int64{}
+	}
+
+	noteCountByPath := make(map[string]int)
+	fileCountByPath := make(map[string]int)
+	for path, info := range infoByPath {
+		for _, id := range info.ids {
+			noteCountByPath[path] += int(noteCountByFID[id])
+			fileCountByPath[path] += int(fileCountByFID[id])
+		}
+	}
+
+	// Root counts (FID = 0)
+	rootNoteCount := 0
+	rootFileCount := 0
+	count, err := s.noteRepo.ListByFIDCount(ctx, 0, vaultID, uid)
+	if err == nil {
+		rootNoteCount = int(count)
+	}
+	count, err = s.fileRepo.ListByFIDCount(ctx, 0, vaultID, uid)
+	if err == nil {
+		rootFileCount = int(count)
+	}
+
+	// Build parent→children map by path
+	childrenByParent := make(map[string][]string)
+	for path, info := range infoByPath {
+		childrenByParent[info.parent] = append(childrenByParent[info.parent], path)
+	}
+
+	// Build tree recursively
+	var buildNode func(path string, currentDepth int) *dto.FolderTreeNode
+	buildNode = func(path string, currentDepth int) *dto.FolderTreeNode {
+		name := path
+		if idx := strings.LastIndex(path, "/"); idx >= 0 {
+			name = path[idx+1:]
+		}
+
+		node := &dto.FolderTreeNode{
+			Path:      path,
+			Name:      name,
+			NoteCount: noteCountByPath[path],
+			FileCount: fileCountByPath[path],
+		}
+
+		if params.Depth > 0 && currentDepth >= params.Depth {
+			return node
+		}
+
+		for _, childPath := range childrenByParent[path] {
+			node.Children = append(node.Children, buildNode(childPath, currentDepth+1))
+		}
+
+		return node
+	}
+
+	// Build root level folders (parent = "")
+	var rootFolders []*dto.FolderTreeNode
+	for _, path := range childrenByParent[""] {
+		rootFolders = append(rootFolders, buildNode(path, 1))
+	}
+
+	return &dto.FolderTreeResponse{
+		Folders:       rootFolders,
+		RootNoteCount: rootNoteCount,
+		RootFileCount: rootFileCount,
+	}, nil
+}
+
+func (s *folderService) CleanDuplicateFolders(ctx context.Context, uid int64, vaultID int64) error {
+	// 1. Get all folder records (including deleted ones for logical cleanup)
+	// 1. 获取所有文件夹记录（包含已删除的，以便按逻辑清理）
+	folders, err := s.folderRepo.ListByUpdatedTimestamp(ctx, 0, vaultID, uid)
+	if err != nil {
+		return err
+	}
+
+	// 2. Group by PathHash
+	// 2. 按 PathHash 分组
+	grouped := make(map[string][]*domain.Folder)
+	for _, f := range folders {
+		grouped[f.PathHash] = append(grouped[f.PathHash], f)
+	}
+
+	// 3. Traverse groups and identify duplicates
+	// 3. 遍历分组，识别重复项
+	for pathHash, list := range grouped {
+		if len(list) <= 1 {
+			continue
+		}
+
+		// Check if any deleted records exist in this group to resolve issues where deleted folders are recreated by EnsurePathFID
+		// 检查这组重复记录中是否有被标记为删除的（处理已删除但仍被 EnsurePathFID 误创出的情况）
+		var hasDeleted bool
+		for _, f := range list {
+			if f.Action == domain.FolderActionDelete {
+				hasDeleted = true
+				break
+			}
+		}
+
+		if hasDeleted {
+			// If deleted records exist, remove all active records for this path to resolve consistency
+			// 如果存在已删除记录，则删除所有未标记删除的记录（解决已删除但仍被 EnsurePathFID 误创出的活跃记录）
+			for _, f := range list {
+				if f.Action != domain.FolderActionDelete {
+					if s.sf != nil {
+						s.sf.Forget(fmt.Sprintf("ensure_folder_%d_%d_%s", uid, vaultID, pathHash))
+					}
+					_ = s.folderRepo.Delete(ctx, f.ID, uid)
+				}
+			}
+		} else {
+			// If all records are active, keep the one with the largest ID (assumed to be the latest)
+			// 如果全部都是活跃记录，保留 ID 最大的一条（假设是最后创建的）
+			var maxID int64
+			for _, f := range list {
+				if f.ID > maxID {
+					maxID = f.ID
+				}
+			}
+
+			for _, f := range list {
+				if f.ID != maxID {
+					if s.sf != nil {
+						s.sf.Forget(fmt.Sprintf("ensure_folder_%d_%d_%s", uid, vaultID, pathHash))
+					}
+					_ = s.folderRepo.Delete(ctx, f.ID, uid)
+				}
+			}
+		}
+	}
+
+	return nil
+}
