@@ -5,6 +5,8 @@ const { syncLocal } = require('./lib/local-sync.cjs');
 const { syncFns, serverUrl } = require('./lib/fns-sync.cjs');
 
 const smoke = process.argv.includes('--smoke-test');
+const macPlatform = process.platform === 'darwin' ? require('./mac/platform.cjs') : null;
+const macUI = Boolean(macPlatform) || process.argv.includes('--mac-preview');
 if (process.env.FFS_TEST_DATA && smoke) app.setPath('userData', path.resolve(process.env.FFS_TEST_DATA));
 let win, tray, dataDir, tasks = [], logs = [], scheduler, quitting = false, writing = false;
 const runs = new Map(), statuses = new Map();
@@ -166,14 +168,15 @@ async function createWindow() {
       titleBarOverlay: { color: '#00000000', symbolColor: '#424c65', height: 44 }
     } : {}),
     title: 'Fast Folder Sync', icon: path.join(__dirname, 'icon.png'), show: false,
-    webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false },
+    webPreferences: { preload: path.join(__dirname, macUI ? 'mac/preload.cjs' : 'preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false },
+    ...(macPlatform ? macPlatform.windowOptions() : {})
   });
-  win.removeMenu();
+  if (macPlatform) macPlatform.installMenu(win); else win.removeMenu();
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', event => event.preventDefault());
   win.webContents.session.setPermissionRequestHandler((_webContents, _permission, callback) => callback(false));
   win.on('close', event => { if (!quitting && tray) { event.preventDefault(); win.hide(); } });
-  await win.loadFile(path.join(__dirname, 'index.html')); win.show();
+  await win.loadFile(path.join(__dirname, macUI ? 'mac/index.html' : 'index.html')); win.show();
   if (smoke) {
     await new Promise(r => setTimeout(r, 700));
     const report = {};
@@ -205,7 +208,8 @@ async function createWindow() {
     await new Promise(r => setTimeout(r, 1500));
     await win.webContents.executeJavaScript("document.getElementById('toast').classList.add('hidden')");
     await fs.writeFile(path.join(dataDir, 'smoke.png'), (await win.webContents.capturePage()).toPNG());
-    if (windows) {
+    if (macUI) report.ui = await require('./mac/verify.cjs').verify(win, dataDir);
+    if (!macUI) {
       report.ui = await win.webContents.executeJavaScript(`(async () => {
         const $ = id => document.getElementById(id);
         const check = (condition, message) => { if (!condition) throw Error(message); };
@@ -262,9 +266,10 @@ else {
     });
     registerIpc(); await createWindow();
     if (!smoke) {
-      tray = new Tray(nativeImage.createFromPath(path.join(__dirname, 'icon.png')).resize({ width: 20, height: 20 }));
+      tray = new Tray(macPlatform ? macPlatform.trayIcon() : nativeImage.createFromPath(path.join(__dirname, 'icon.png')).resize({ width: 20, height: 20 }));
       tray.setToolTip('Fast Folder Sync');
       tray.setContextMenu(Menu.buildFromTemplate([{ label: '打开 Fast Folder Sync', click: () => win.show() }, { label: '退出', click: () => { quitting = true; app.quit(); } }])); tray.on('double-click', () => win.show());
+      if (macPlatform) tray.on('click', () => { win.show(); win.focus(); });
       scheduler = setInterval(() => { for (const t of tasks) if (t.enabled && !runs.has(t.id) && (statuses.get(t.id)?.nextRun || 0) <= Date.now()) void run(t.id); }, 1000);
     }
   }).catch(async e => { if (smoke) { await atomicJson(path.join(dataDir, 'smoke-error.json'), { error: e.message, stack: e.stack }); app.exit(1); } else { dialog.showErrorBox('Fast Folder Sync 启动失败', e.message); quitting = true; app.quit(); } });

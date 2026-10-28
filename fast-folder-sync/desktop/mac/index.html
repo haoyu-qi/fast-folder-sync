@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Fast Folder Sync</title><link rel="stylesheet" href="style.css"><script src="icons.js" defer></script><script src="renderer.js" defer></script>
+</head>
+<body>
+  <div class="window-drag" aria-hidden="true"></div>
+  <aside>
+    <div class="brand"><img src="../icon.png" alt="" class="brand-icon"><div>Fast Folder<span>同步，让文件随行</span></div></div>
+    <div class="workspace-label">工作空间</div>
+    <nav aria-label="工作空间"><button class="nav active" data-page="tasks" aria-current="page"><i data-icon="FolderSync"></i><span>文件夹任务</span><b id="nav-count">0</b></button><button class="nav" data-page="activity"><i data-icon="Activity"></i><span>同步记录</span></button><button class="nav" data-page="history"><i data-icon="History"></i><span>历史版本</span></button></nav>
+    <div class="side-note"><div class="side-shield"><i data-icon="ShieldCheck"></i></div><strong>文件在你掌控之中</strong><p>本地文件夹 · 私有同步服务<br>每一次覆盖，都有迹可循。</p><div class="side-status"><span class="live-dot"></span><span id="scheduler-status">暂无自动任务</span></div></div>
+    <button class="data-button" id="open-data"><i data-icon="Settings2"></i>应用数据目录<i data-icon="ExternalLink"></i></button><div class="version"><span>Fast Folder Sync</span><span>v0.2.1</span></div>
+  </aside>
+  <main>
+    <div class="workspace-bar"><span>个人工作空间<span class="breadcrumb-divider">/</span>同步与备份</span><span class="local-pill"><i data-icon="HardDrive"></i>本地优先</span></div>
+    <header><div><h1 id="page-title">文件夹任务</h1><p id="page-description">让重要文件，始终多一份安心。</p></div><button class="primary" id="add-task"><i data-icon="Plus"></i>新建任务</button></header>
+    <section class="metrics" aria-label="任务概览"><div><div class="metric-label"><span>全部任务</span><i data-icon="Folder"></i></div><strong id="total-count">0</strong><small>每个文件夹，独立守护</small></div><div><div class="metric-label"><span>自动同步</span><i data-icon="RefreshCw"></i></div><strong id="enabled-count">0</strong><small><i class="live-dot"></i>后台定期核对</small></div><div><div class="metric-label"><span>最近成功</span><i data-icon="CircleCheck"></i></div><strong id="success-count">0</strong><small>任务已完成核对</small></div><div><div class="metric-label"><span>需要关注</span><i data-icon="CircleAlert"></i></div><strong id="attention-count">0</strong><small>错误或保留的冲突</small></div></section>
+    <section id="tasks-page" class="page"><div class="section-heading"><h2>我的同步任务 <span id="visible-count">0 项</span></h2><label class="search-box"><i data-icon="Search"></i><input id="task-search" type="search" placeholder="搜索名称或路径" aria-label="搜索任务"></label></div><div class="task-toolbar"><div class="segmented" role="group" aria-label="筛选任务"><button class="selected" data-filter="all" aria-pressed="true">全部任务</button><button data-filter="auto" aria-pressed="false">自动同步</button><button data-filter="attention" aria-pressed="false">需要关注</button></div><span class="background-hint">关闭窗口后继续在菜单栏后台运行</span></div><div id="task-list"></div><div id="no-results" class="panel-empty hidden"><i data-icon="Search"></i><h2>没有匹配的任务</h2><p>试试其他名称或路径，或切换到全部任务。</p><button id="clear-search">清除筛选</button></div><div id="empty" class="empty"><div class="empty-icon"><i data-icon="FolderSync"></i></div><span class="empty-kicker">一处修改，处处安心</span><h2>从一个文件夹开始</h2><p>把工作文档、照片或项目文件备份到另一块磁盘，<br>或通过私有服务，在多台电脑间保持同步。</p><button class="primary" id="empty-add"><i data-icon="Plus"></i>创建第一个任务</button><div class="empty-hint"><i data-icon="ShieldCheck"></i>覆盖前备份<span>·</span>冲突副本保留<span>·</span>任意文件类型</div></div><div class="safety-note"><i data-icon="ShieldCheck"></i><span><strong>为每一份文件留好退路</strong><br>默认不传播删除。开启后，所有覆盖和删除操作仍会先保存本地历史版本。</span></div></section>
+    <section id="activity-page" class="page hidden"><div class="section-heading"><h2>最近活动</h2><select id="log-filter"><option value="">所有任务</option></select></div><div id="logs" class="panel"></div><p class="footnote">本次运行最多保留 500 条记录。历史版本独立保存，不受日志条数影响。</p></section>
+    <section id="history-page" class="page hidden"><div class="section-heading"><h2>可恢复的历史版本</h2><div class="row"><select id="history-task"><option value="">选择一个任务</option></select><button id="refresh-history">刷新</button></div></div><p class="footnote">恢复前请先关闭任务的自动同步。恢复操作也会备份当前文件。</p><div id="history-list" class="panel"></div></section>
+    <footer><span class="live-dot"></span>文件保存在你选择的文件夹中<span>你的文件，你的空间。</span></footer>
+  </main>
+  <dialog id="task-dialog" aria-labelledby="form-title"><form id="task-form"><div class="dialog-heading"><div><div class="eyebrow">同步与备份</div><h2 id="form-title">新建文件夹任务</h2></div><button type="button" class="icon-button" id="close-dialog" aria-label="关闭"><i data-icon="X"></i></button></div>
+    <label>任务名称<input id="task-name" required maxlength="100" placeholder="例如：工作文档备份" autofocus></label>
+    <label>源文件夹<div class="path-input"><input id="source" required placeholder="选择需要保护的文件夹" readonly><button type="button" id="pick-source">选择文件夹</button></div></label>
+    <div class="two-columns"><label>目标类型<select id="backend"><option value="local">本地 / 移动磁盘 / 已挂载网络目录</option><option value="fns">Folder Sync 私有服务</option></select></label><label>任务模式<select id="mode"><option value="backup">单向备份：源 → 目标</option><option value="sync">双向同步：源 ⇄ 目标</option></select></label></div>
+    <div id="local-fields"><label>目标文件夹<div class="path-input"><input id="target" placeholder="选择备份或同步目标" readonly><button type="button" id="pick-target">选择文件夹</button></div></label></div>
+    <div id="remote-fields" class="hidden"><label>服务地址<input id="server" type="url" placeholder="https://sync.example.com"></label><div class="two-columns"><label>文件库名称<input id="vault" placeholder="与服务端配置一致"></label><label>访问令牌<input id="token" type="password" autocomplete="off" placeholder="仅在此电脑加密保存"></label></div><p class="footnote">填写服务地址、文件库名和设备令牌。新版服务自动启用完整 SHA-256 校验与通用二进制传输。</p></div>
+    <div class="two-columns"><label>自动核对间隔（秒）<input id="interval" type="number" min="10" max="86400" value="30" required></label><label>排除规则（每行一条）<textarea id="excludes" rows="3" placeholder="*.tmp&#10;cache/**"></textarea></label></div>
+    <p class="footnote">默认排除 .git、node_modules、系统缓存和临时传输文件；跳过符号链接。</p>
+    <label class="checkbox"><input id="enabled" type="checkbox" checked><span>保存后自动定期同步</span></label>
+    <label class="checkbox"><input id="propagate-deletes" type="checkbox"><span>传播删除（默认关闭，开启后仍会先备份被删除文件）</span></label>
+    <p id="edit-hint" class="footnote hidden">已有任务的路径、目标类型、模式和删除策略固定。需要调整时请新建任务。</p>
+    <div id="form-error" role="alert"></div><div class="dialog-actions"><button type="button" id="cancel-dialog">取消</button><button class="primary" id="save-button" type="submit">保存任务</button></div>
+  </form></dialog><div id="toast" role="status" class="hidden"></div>
+</body></html>

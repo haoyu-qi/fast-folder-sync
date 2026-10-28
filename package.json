@@ -8,6 +8,7 @@
     "desktop:test": "npm --prefix fast-folder-sync/desktop test",
     "desktop:start": "npm --prefix fast-folder-sync/desktop start",
     "desktop:build": "npm --prefix fast-folder-sync/desktop run dist:win",
+    "desktop:build:mac": "npm --prefix fast-folder-sync/desktop run dist:mac",
     "web:check": "npm --prefix fast-folder-sync-service/web run check",
     "web:test": "npm --prefix fast-folder-sync-service/web test",
     "web:build": "npm --prefix fast-folder-sync-service/web run build"

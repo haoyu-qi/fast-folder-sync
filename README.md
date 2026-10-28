@@ -1,6 +1,6 @@
 # Fast Folder Sync
 
-通用文件夹备份与同步软件，包含独立桌面客户端和可私有部署的服务端。支持文档、照片、视频、代码及其他二进制文件。Windows 客户端采用浅色毛玻璃界面；服务端管理台采用暖白背景、陶土色按钮与衬线标题。
+通用文件夹备份与同步软件，包含独立桌面客户端和可私有部署的服务端。支持文档、照片、视频、代码及其他二进制文件。Windows 与 Mac 客户端采用毛玻璃界面，Mac 支持系统浅深主题；服务端管理台采用暖白背景、陶土色按钮与衬线标题。
 
 当前改造版本：**0.2.1**。基于 Apache-2.0 许可的 Fast Note Sync 客户端与服务端改造，上游来源见 [NOTICE](NOTICE.md)。
 
@@ -41,7 +41,9 @@ npm test
 npm start
 ```
 
-Windows 便携版构建：`npm run dist:win`。其他系统提供构建配置，需在对应机器验证。
+Windows 便携版构建：`npm run dist:win`。Mac 构建：`npm run dist:mac`，输出 Apple Silicon 与 Intel 两种架构的 DMG / ZIP，详见 [Mac 客户端说明](fast-folder-sync/docs/desktop-mac.md)。Mac 发布使用独立的 `v0.2.1-macos` 预览标签，保留 Windows `v0.2.1` 标签。
+
+![Mac 客户端布局预览（Windows 环境）](docs/images/desktop-mac.png)
 
 ## 服务端开发
 

@@ -1,0 +1,49 @@
+name: macOS glass client
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [arm64, x64]
+    defaults:
+      run:
+        working-directory: fast-folder-sync/desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: fast-folder-sync/desktop/package-lock.json
+      - run: npm ci
+      - run: npm run check && npm run check:mac && npm test
+      - name: Verify native Mac UI and file recovery
+        env:
+          FFS_TEST_DATA: ${{ runner.temp }}/ffs-mac-data
+          FFS_SMOKE_SOURCE: ${{ runner.temp }}/ffs-mac-source
+          FFS_SMOKE_TARGET: ${{ runner.temp }}/ffs-mac-target
+        run: |
+          mkdir -p "$FFS_SMOKE_SOURCE" "$FFS_SMOKE_TARGET"
+          printf 'Version 1' > "$FFS_SMOKE_SOURCE/readme.txt"
+          npx electron . --smoke-test
+      - name: Build locally signed DMG and ZIP
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npx electron-builder --config electron-builder.mac.cjs --mac dmg zip --${{ matrix.arch }} --publish never -c.mac.identity=-
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Fast-Folder-Sync-macOS-${{ matrix.arch }}
+          path: |
+            fast-folder-sync/desktop/release/mac-glass/*.dmg
+            fast-folder-sync/desktop/release/mac-glass/*.zip
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macOS-validation-${{ matrix.arch }}
+          path: |
+            ${{ runner.temp }}/ffs-mac-data/*.json
+            ${{ runner.temp }}/ffs-mac-data/*.png

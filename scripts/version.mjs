@@ -11,6 +11,7 @@ const markers = [
   ['README.md', /当前改造版本：\*\*([^*]+)\*\*/g],
   ['fast-folder-sync-service/compose.folder.yaml', /image: fast-folder-sync-service:([^\s]+)/g],
   ['fast-folder-sync/desktop/index.html', /Fast Folder Sync · v([^<\s]+)/g],
+  ['fast-folder-sync/desktop/mac/index.html', /<span>v([^<\s]+)<\/span>/g],
   ['fast-folder-sync/desktop/lib/fns-sync.cjs', /clientVersion: '([^']+)'/g],
   ['fast-folder-sync/desktop/lib/fns-sync.cjs', /type: 'FastFolderSync', version: '([^']+)'/g],
   ['fast-folder-sync-service/web/src/api.js', /'x-client-version': '([^']+)'/g],
