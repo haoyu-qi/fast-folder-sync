@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.folder
-    image: fast-folder-sync-service:0.2.0
+    image: fast-folder-sync-service:0.2.1
     container_name: fast-folder-sync
     restart: unless-stopped
     ports:

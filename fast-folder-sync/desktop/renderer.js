@@ -1,5 +1,29 @@
 const $ = id => document.getElementById(id);
 const api = window.folderSync;
+document.documentElement.classList.toggle('windows', api.platform === 'win32');
+const iconPaths = {
+  sync: ['M20 7H5l4-4', 'M4 17h15l-4 4', 'M20 7v5', 'M4 17v-5'],
+  folder: ['M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z'],
+  folders: ['M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z', 'M7 2h6l2 2h5'],
+  activity: ['M4 5h16', 'M4 12h4l3-4 3 8 3-4h3', 'M4 20h16'],
+  history: ['M3 11a9 9 0 1 1 2.6 7.4', 'M3 4v7h7', 'M12 7v5l3 2'],
+  shield: ['M12 3 4 6v6c0 5 8 9 8 9s8-4 8-9V6Z', 'm8.5 12 2.5 2.5 4.5-5'],
+  check: ['M21 11v1a9 9 0 1 1-5.3-8.2', 'm8 11 4 4L22 5'],
+  attention: ['M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18', 'M12 7v6', 'M12 17h.01'],
+  plus: ['M12 5v14', 'M5 12h14'],
+  close: ['m6 6 12 12', 'M18 6 6 18'],
+  lock: ['M7 10V7a5 5 0 0 1 10 0v3', 'M5 10h14v11H5Z', 'M12 14v3'],
+  external: ['M14 3h7v7', 'M21 3 10 14', 'M10 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5'],
+  settings: ['m9 3-.7 3-2.6 1.5L3 7l-1 3 2.3 2L4 15l-1 2 2.5 2 2.6-1 2.4 1.5L11 22h3l.8-3 2.5-1.5 2.7.5 1-3-2.3-2 .3-3 1-2L17.5 6 15 7l-2.5-1.5L12 3Z', 'M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6']
+};
+function icon(name) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  for (const [key, value] of Object.entries({ viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.7', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true', focusable: 'false' })) svg.setAttribute(key, value);
+  svg.classList.add('icon');
+  for (const d of iconPaths[name] || []) { const path = document.createElementNS(svg.namespaceURI, 'path'); path.setAttribute('d', d); svg.append(path); }
+  return svg;
+}
+document.querySelectorAll('[data-icon]').forEach(el => el.append(icon(el.dataset.icon)));
 let state = { tasks: [], logs: [] }, editing = null, toastTimer;
 const phaseNames = { running: '正在同步', waiting: '等待下次同步', success: '同步完成', error: '需要关注', paused: '已暂停' };
 function node(tag, cls, text) { const el = document.createElement(tag); if (cls) el.className = cls; if (text !== undefined) el.textContent = text; return el; }
@@ -8,7 +32,10 @@ function action(label, handler, cls) { const button = node('button', cls, label)
 function date(value) { return value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '尚未运行'; }
 function switchPage(page) {
   for (const p of ['tasks', 'activity', 'history']) $(p + '-page').classList.toggle('hidden', p !== page);
-  document.querySelectorAll('[data-page]').forEach(button => button.classList.toggle('active', button.dataset.page === page));
+  document.querySelectorAll('[data-page]').forEach(button => {
+    button.classList.toggle('active', button.dataset.page === page);
+    if (button.dataset.page === page) button.setAttribute('aria-current', 'page'); else button.removeAttribute('aria-current');
+  });
   $('page-title').textContent = { tasks: '文件夹任务', activity: '同步记录', history: '历史版本' }[page];
   $('page-description').textContent = { tasks: '让重要文件，始终多一份安心。', activity: '每一次变化，都有迹可循。', history: '找回覆盖或删除前的那一份文件。' }[page];
 }
@@ -30,7 +57,8 @@ function render(data) {
 function taskCard(task) {
   const card = node('article', 'task-card');
   const top = node('div', 'task-top'), title = node('div', 'task-title');
-  title.append(node('h3', '', task.name), node('span', 'tag', task.mode === 'backup' ? '单向备份' : '双向同步'));
+  const tile = node('span', 'task-folder-icon'); tile.append(icon(task.backend === 'local' ? 'folder' : 'sync'));
+  title.append(tile, node('h3', '', task.name), node('span', 'tag', task.mode === 'backup' ? '单向备份' : '双向同步'));
   top.append(title, node('span', 'badge ' + task.status.phase, phaseNames[task.status.phase] || '等待中'));
   const paths = node('div', 'paths');
   for (const [index, value] of [task.source, task.backend === 'local' ? task.target : task.server + ' / ' + task.vault].entries()) {

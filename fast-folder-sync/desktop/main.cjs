@@ -157,7 +157,17 @@ function registerIpc() {
   ipc('open-data', async () => { const error = await shell.openPath(dataDir); if (error) throw Error(error); });
 }
 async function createWindow() {
-  win = new BrowserWindow({ width: 1240, height: 840, minWidth: 960, minHeight: 660, backgroundColor: '#f6f8fb', title: 'Fast Folder Sync', icon: path.join(__dirname, 'icon.png'), show: false, webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false } });
+  const windows = process.platform === 'win32';
+  win = new BrowserWindow({
+    width: 1280, height: 880, minWidth: 960, minHeight: 660,
+    backgroundColor: windows ? '#00000000' : '#eef1f8',
+    ...(windows ? {
+      backgroundMaterial: 'acrylic', titleBarStyle: 'hidden',
+      titleBarOverlay: { color: '#00000000', symbolColor: '#424c65', height: 44 }
+    } : {}),
+    title: 'Fast Folder Sync', icon: path.join(__dirname, 'icon.png'), show: false,
+    webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false },
+  });
   win.removeMenu();
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', event => event.preventDefault());
@@ -167,6 +177,11 @@ async function createWindow() {
   if (smoke) {
     await new Promise(r => setTimeout(r, 700));
     const report = {};
+    const capture = async name => {
+      await new Promise(r => setTimeout(r, 150));
+      await fs.writeFile(path.join(dataDir, name + '.png'), (await win.webContents.capturePage()).toPNG());
+    };
+    await capture('empty');
     if (process.env.FFS_SMOKE_SOURCE && process.env.FFS_SMOKE_TARGET) {
       const source = path.resolve(process.env.FFS_SMOKE_SOURCE), target = path.resolve(process.env.FFS_SMOKE_TARGET);
       await win.webContents.executeJavaScript(`(() => { document.getElementById('add-task').click(); document.getElementById('task-name').value='工作文档备份'; document.getElementById('source').value=${JSON.stringify(source)}; document.getElementById('target').value=${JSON.stringify(target)}; document.getElementById('enabled').checked=false; document.getElementById('task-form').requestSubmit(); })()`);
@@ -190,6 +205,45 @@ async function createWindow() {
     await new Promise(r => setTimeout(r, 1500));
     await win.webContents.executeJavaScript("document.getElementById('toast').classList.add('hidden')");
     await fs.writeFile(path.join(dataDir, 'smoke.png'), (await win.webContents.capturePage()).toPNG());
+    if (windows) {
+      report.ui = await win.webContents.executeJavaScript(`(async () => {
+        const $ = id => document.getElementById(id);
+        const check = (condition, message) => { if (!condition) throw Error(message); };
+        document.querySelector('[data-page="activity"]').click();
+        check(!$('activity-page').classList.contains('hidden') && $('tasks-page').classList.contains('hidden'), '活动导航失败');
+        check(document.querySelector('[aria-current="page"]').dataset.page === 'activity', '导航无障碍状态错误');
+        document.querySelector('[data-page="history"]').click();
+        check(!$('history-page').classList.contains('hidden'), '历史导航失败');
+        $('add-task').click();
+        check($('task-dialog').open && document.activeElement.id === 'task-name', '弹窗或初始焦点错误');
+        $('backend').value = 'fns'; $('backend').dispatchEvent(new Event('change'));
+        check(!$('remote-fields').classList.contains('hidden') && $('mode').disabled && $('mode').value === 'sync' && $('token').required, '私有服务表单错误');
+        $('backend').value = 'local'; $('backend').dispatchEvent(new Event('change'));
+        check(!$('local-fields').classList.contains('hidden') && !$('mode').disabled && $('target').required, '本地表单错误');
+        $('cancel-dialog').click();
+        check(!$('task-dialog').open, '弹窗取消失败');
+        document.querySelector('[data-page="tasks"]').click();
+        return { navigation: true, dialogFocus: true, backendFields: true, cancel: true };
+      })()`);
+      await win.webContents.executeJavaScript("document.getElementById('add-task').click()"); await capture('dialog');
+      await win.webContents.executeJavaScript("document.getElementById('cancel-dialog').click(); document.querySelector('[data-page=activity]').click()"); await capture('activity');
+      await win.webContents.executeJavaScript(`(async () => {
+        document.querySelector('[data-page=history]').click();
+        const select = document.getElementById('history-task');
+        if (select.options.length > 1) { select.selectedIndex = 1; await renderHistory(); }
+      })()`); await capture('history');
+      await win.webContents.executeJavaScript("document.querySelector('[data-page=tasks]').click()");
+      win.setSize(960, 660); await capture('compact');
+      report.ui.compact = await win.webContents.executeJavaScript(`(() => {
+        if (document.documentElement.scrollWidth > innerWidth) throw Error('最小窗口出现横向溢出');
+        for (const el of document.querySelectorAll('button')) {
+          if (!el.checkVisibility()) continue;
+          const r = el.getBoundingClientRect();
+          if (r.left < 0 || r.right > innerWidth) throw Error('最小窗口按钮被截断：' + el.textContent);
+        }
+        return { width: innerWidth, height: innerHeight, horizontalOverflow: false };
+      })()`);
+    }
     const state = await win.webContents.executeJavaScript('({title:document.title,cards:document.querySelectorAll(".task-card").length,bridge:typeof window.folderSync.getState})');
     await atomicJson(path.join(dataDir, 'smoke.json'), { ...state, ...report }); quitting = true; app.quit();
   }
