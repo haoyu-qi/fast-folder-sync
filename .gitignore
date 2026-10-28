@@ -10,6 +10,11 @@
 *.zip
 *.7z
 /work/
+/.local/
+/artifacts/
+/config/
+/storage/
+/本地项目说明.md
 /fast-folder-sync-service/storage/
 /fast-folder-sync-service/build/
 /fast-folder-sync-service/fast-folder-sync-service

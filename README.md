@@ -4,6 +4,8 @@
 
 当前改造版本：**0.2.0**。基于 Apache-2.0 许可的 Fast Note Sync 客户端与服务端改造，上游来源见 [NOTICE](NOTICE.md)。
 
+版本由根目录 `VERSION` 统一管理，执行 `npm run version:check` 核对两端版本；更新版本使用 `npm run version:set -- 0.2.1`。发布记录见 [CHANGELOG](CHANGELOG.md)，分支、标签和回滚流程见 [版本管理说明](docs/VERSIONING.md)。
+
 ![服务端管理台](docs/images/server.png)
 
 ## 功能

@@ -1,0 +1,15 @@
+{
+  "name": "fast-folder-sync-project",
+  "private": true,
+  "scripts": {
+    "version:check": "node scripts/version.mjs check",
+    "version:set": "node scripts/version.mjs set",
+    "desktop:check": "npm --prefix fast-folder-sync/desktop run check",
+    "desktop:test": "npm --prefix fast-folder-sync/desktop test",
+    "desktop:start": "npm --prefix fast-folder-sync/desktop start",
+    "desktop:build": "npm --prefix fast-folder-sync/desktop run dist:win",
+    "web:check": "npm --prefix fast-folder-sync-service/web run check",
+    "web:test": "npm --prefix fast-folder-sync-service/web test",
+    "web:build": "npm --prefix fast-folder-sync-service/web run build"
+  }
+}
