@@ -1,7 +1,7 @@
 {
   "name": "fast-folder-sync",
   "productName": "Fast Folder Sync",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Standalone folder backup and synchronization client",
   "author": "Fast Folder Sync contributors",
   "license": "Apache-2.0",
@@ -45,6 +45,7 @@
     ],
     "icon": "icon.png",
     "win": {
+      "artifactName": "Fast-Folder-Sync-${version}-Windows-${arch}.${ext}",
       "target": "portable",
       "icon": "icon.ico",
       "signAndEditExecutable": false

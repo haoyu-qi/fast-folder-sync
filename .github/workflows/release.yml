@@ -1,0 +1,155 @@
+name: Release paired clients and server
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: fast-folder-sync-service/go.mod
+          cache-dependency-path: fast-folder-sync-service/go.sum
+      - name: Verify immutable product tag and version
+        shell: bash
+        run: |
+          test "$GITHUB_REF_NAME" = "v$(cat VERSION)"
+          npm run version:check
+      - run: npm ci --ignore-scripts && npm run check && npm run check:mac && npm test
+        working-directory: fast-folder-sync/desktop
+      - run: npm ci && npm run check && npm test && npm run build
+        working-directory: fast-folder-sync-service/web
+      - run: go test ./internal/routers/api_router ./internal/routers/websocket_router ./internal/middleware ./internal/service ./pkg/util ./pkg/storage/local_fs
+        working-directory: fast-folder-sync-service
+        env:
+          CGO_ENABLED: '0'
+  server:
+    needs: verify
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            platform: Windows
+            binary: fast-folder-sync-service.exe
+          - os: ubuntu-latest
+            platform: Linux
+            binary: fast-folder-sync-service
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: fast-folder-sync-service/go.mod
+          cache-dependency-path: fast-folder-sync-service/go.sum
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - run: npm ci && npm run build
+        working-directory: fast-folder-sync-service/web
+      - run: go build -trimpath -ldflags="-s -w" -o ../artifacts/${{ matrix.binary }} .
+        working-directory: fast-folder-sync-service
+        env:
+          CGO_ENABLED: '0'
+          GOARCH: amd64
+      - run: node scripts/server-smoke.mjs artifacts/${{ matrix.binary }}
+      - run: python scripts/package-server.py artifacts/${{ matrix.binary }} ${{ matrix.platform }} artifacts/packages
+      - uses: actions/upload-artifact@v4
+        with:
+          name: server-${{ matrix.platform }}
+          path: artifacts/packages/*.zip
+          if-no-files-found: error
+  windows:
+    needs: verify
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: fast-folder-sync/desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npx electron-builder --win portable --publish never
+      - name: Verify the packaged Windows client
+        shell: pwsh
+        env:
+          FFS_TEST_DATA: ${{ runner.temp }}/ffs-data
+          FFS_SMOKE_SOURCE: ${{ runner.temp }}/ffs-source
+          FFS_SMOKE_TARGET: ${{ runner.temp }}/ffs-target
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:FFS_SMOKE_SOURCE,$env:FFS_SMOKE_TARGET | Out-Null
+          [IO.File]::WriteAllText((Join-Path $env:FFS_SMOKE_SOURCE 'readme.txt'), 'Version 1')
+          $ffsVersion = (Get-Content ../../VERSION).Trim()
+          $client = Start-Process -FilePath "release/Fast-Folder-Sync-$ffsVersion-Windows-x64.exe" -ArgumentList '--smoke-test' -WindowStyle Hidden -PassThru -Wait
+          if ($client.ExitCode -ne 0) { throw 'Packaged Windows client validation failed' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: client-Windows
+          path: fast-folder-sync/desktop/release/*.exe
+          if-no-files-found: error
+  mac:
+    needs: verify
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        arch: [arm64, x64]
+    defaults:
+      run:
+        working-directory: fast-folder-sync/desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - name: Verify Mac interface and file recovery on the runner
+        env:
+          FFS_TEST_DATA: ${{ runner.temp }}/ffs-mac-data
+          FFS_SMOKE_SOURCE: ${{ runner.temp }}/ffs-mac-source
+          FFS_SMOKE_TARGET: ${{ runner.temp }}/ffs-mac-target
+        run: |
+          mkdir -p "$FFS_SMOKE_SOURCE" "$FFS_SMOKE_TARGET"
+          printf 'Version 1' > "$FFS_SMOKE_SOURCE/readme.txt"
+          npx electron . --smoke-test
+      - name: Build Mac packages with local ad-hoc signing
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npx electron-builder --config electron-builder.mac.cjs --mac dmg zip --${{ matrix.arch }} --publish never -c.mac.identity=-
+      - uses: actions/upload-artifact@v4
+        with:
+          name: client-macOS-${{ matrix.arch }}
+          path: |
+            fast-folder-sync/desktop/release/mac-glass/*.dmg
+            fast-folder-sync/desktop/release/mac-glass/*.zip
+          if-no-files-found: error
+  publish:
+    needs: [server, windows, mac]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Create checksums
+        working-directory: dist
+        run: sha256sum *.exe *.dmg *.zip > SHA256SUMS.txt
+      - name: Publish the complete paired release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(cat VERSION)
+          gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --draft --title "Fast Folder Sync $VERSION · 统一毛玻璃界面" --notes-file "docs/RELEASE-$VERSION.md"
+          gh release edit "$GITHUB_REF_NAME" --draft=false --latest

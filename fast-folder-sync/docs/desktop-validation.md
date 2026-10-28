@@ -2,6 +2,10 @@
 
 最近验证日期：2026-10-28（Asia/Shanghai）。
 
+## 0.2.2 配套版本
+
+本次 Windows 实际便携包、Mac renderer 预览、真实跨端联调及网页界面检查见 [0.2.2 验证记录](../../docs/VALIDATION-0.2.2.md)。下文按原日期保留历史验证结果。
+
 ## 毛玻璃界面验证（2026-10-28）
 
 - `npm run check`、`npm test`（20 项）、根目录 `npm run version:check` 通过。

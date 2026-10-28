@@ -1,83 +1,73 @@
-# Folder Sync 服务端 0.2.0
+# Folder Sync 服务端
 
-这是基于 `haierkeys/fast-note-sync-service` 改造的通用文件夹备份与同步服务端。控制台改为文件库、文件浏览、备份任务、连接设备、同步记录、回收站和存储位置；采用暖白、灰褐、陶土色与衬线标题的 Claude 风格。
+产品版本 **0.2.2**。为桌面客户端提供私有文件同步、网页文件管理和计划备份，网页端与客户端采用统一的蓝紫毛玻璃界面。
 
-原有数据库结构和同步协议继续兼容。旧文本资源在新界面中显示为普通文件；管理台没有在线笔记编辑或 Obsidian 授权入口。
+## 产品说明
 
-## Windows 运行
+管理台提供「概览」「文件浏览」「备份任务」「连接设备」「同步记录」「回收站」「存储位置」「设置」。概览显示文件数量、存储用量、自动备份与文件库；浏览器可上传、下载、搜索和重命名文件，也可恢复软删除文件。
 
-1. 解压 Windows 服务端包，在一个用于保存服务配置和数据的目录中运行 `start.cmd`。
-2. 浏览器打开 `http://127.0.0.1:9000/webgui/`，创建首个账户。
-3. 新建文件库，在「连接设备」中生成设备配置。
-4. 桌面客户端选择「Folder Sync 私有服务」，填写服务地址、文件库名和设备令牌，再选择本地文件夹。
+![网页服务端管理台](../docs/images/server.jpg)
 
-没有现成配置时，程序会生成随机认证密钥。上游逻辑会在首个账户建立后关闭公开注册；增加账户或重新开放注册需要在服务配置中处理。
+桌面端通过设备令牌连接文件库，支持多台电脑双向同步。所有新文件统一以二进制传输，使用完整 SHA-256 校验；已有文本资源及旧同步接口继续兼容。文件库改名后，需要更新桌面端对应任务的文件库名称。
 
-默认 HTTP 端口为 9000。可以使用 `fast-folder-sync-service.exe run -p 127.0.0.1:9000` 只监听本机；原有 `-p` 参数未生效的问题也已修复。跨设备使用时填写服务端可访问的地址，反向代理可通过 `server.ext-api-url` 配置 API 地址。
+服务端可向本地磁盘、S3、OSS、R2、MinIO 和 WebDAV 备份。先在「存储位置」添加并验证目标，再建立「备份任务」；具体类型需在服务配置中启用。
 
-## Linux 运行
+| 备份方式 | 用途 |
+| --- | --- |
+| 全量归档 | 生成完整备份 |
+| 增量归档 | 按增量机制保存变更 |
+| 镜像同步 | 让目标跟随源内容 |
+
+备份计划使用服务端时区。回收站恢复服务端软删除的文件，备份归档由所选存储位置保存。客户端源目录、服务端文件存储和备份目标分别管理。
+
+## 部署说明
+
+### Docker 从源码部署
+
+在仓库根目录执行：
+
+```sh
+git checkout v0.2.2
+cd fast-folder-sync-service
+docker compose -f compose.folder.yaml up -d --build
+```
+
+需要 Docker 与 Docker Compose，首次构建需要联网。构建会生成网页资源并嵌入 Go 程序，无需在宿主机安装 Node.js 或 Go。配置卷为 `folder-sync-config`，数据卷为 `folder-sync-storage`，时区为 `Asia/Shanghai`。
+
+### Windows / Linux 安装包
+
+从 [0.2.2 发布页](https://github.com/haoyu-qi/fast-folder-sync/releases/tag/v0.2.2)下载对应服务端 ZIP，解压到固定目录。
+
+Windows 运行 `start.cmd`，或在 PowerShell 执行：
+
+```powershell
+.\fast-folder-sync-service.exe run
+```
+
+Linux 在解压目录执行：
 
 ```sh
 chmod +x fast-folder-sync-service start.sh
 ./start.sh
 ```
 
-Linux amd64 交付物已交叉编译，当前环境没有 Linux / Docker 运行时，未在 Linux 上实际启动。生产部署前请在目标机器验证配置和数据目录权限。
+原生程序需要长期后台运行时，请使用操作系统的服务管理器托管。默认监听端口为 9000。只允许本机访问时，可用 `run -p 127.0.0.1:9000` 启动；跨设备同步应使用其他电脑能访问的监听地址与端口。
 
-## Docker 从源码构建
+### 首次配置
 
-```sh
-docker compose -f compose.folder.yaml up -d --build
-```
+1. 打开 `http://127.0.0.1:9000/webgui/`，创建首个账户。
+2. 新建文件库，在「连接设备」中生成设备配置。
+3. 桌面端新建任务，选择本地文件夹与「Folder Sync 私有服务」。
+4. 填入服务根地址、相同文件库名称与设备令牌，保存并同步。其他电脑连接同一文件库即可同步。
 
-构建会先编译可编辑的前端，再编译 Go 服务端。配置和数据分别保存在两个命名卷中。Docker 配方已提供，当前环境未实际运行 Docker 构建。
+首次启动且没有已有配置时，会生成 `config/config.yaml` 和随机认证密钥。首个账户建立后默认关闭公开注册；增加账户或重新开放注册需在服务配置中处理。跨设备连接时，将 `127.0.0.1` 换为服务端可访问地址；桌面端填写根地址，不附加 `/webgui/`。
 
-## 备份
+### 数据、网络与升级
 
-先在「存储位置」添加本地磁盘、S3、OSS、R2、MinIO 或 WebDAV 配置，再建立备份任务。界面会验证连接后保存。存储类型受服务配置的启用开关限制。
+默认数据库在 `storage/database/db.sqlite3`，上传文件在 `storage/uploads/`。本地备份保存目录位于 `storage.local-fs.save-path` 所配置的根目录下；默认启用本地存储，默认关闭 HTTP 静态文件直出。
 
-本地存储默认启用，HTTP 静态文件直出默认关闭。本地保存目录是服务端 `storage.local-fs.save-path` 下的路径前缀，默认根目录为 `storage/uploads`。客户端源目录、服务端文件存储和备份目标是不同的位置。
+反向代理需要转发 HTTP API 和 `/api/user/sync` 的 WebSocket 连接。对外地址通过 `server.ext-api-url` 配置。浏览器单次上传请求上限为 512 MiB，反向代理的请求上限应与实际需求匹配。
 
-- **全量归档**：生成一份完整备份。
-- **增量归档**：沿用上游的增量备份机制。
-- **镜像同步**：使备份目标跟随源内容，创建前应确认这一行为。
+升级前停止服务并备份配置、数据库和文件存储。原生部署只替换程序及启动脚本，保留 `config/` 与 `storage/`；Docker 更新源码后重建，保留原命名卷，不使用 `down -v`。
 
-Cron 使用服务端时区，界面默认为每天 00:30。备份执行记录显示实际文件数量和状态。回收站恢复的是软删除文件，备份归档仍由存储位置保留和管理。
-
-## 适配内容
-
-新增 `/api/drive/capabilities` 公共能力描述，以及仅允许真实 WebGUI 登录会话访问的文件管理接口：
-
-| 接口 | 用途 |
-| --- | --- |
-| `GET /api/drive/spaces` | 文件库列表，统一文件数量与存储用量 |
-| `POST /api/drive/spaces` | 创建或修改文件库 |
-| `GET /api/drive/entries` | 统一文件列表、搜索、分页和回收站 |
-| `GET /api/drive/content` | 带认证的文件下载，含旧文本资源 |
-| `POST /api/drive/upload` | 流式上传，完整 SHA-256；单次 HTTP 请求上限 512 MiB |
-| `DELETE /api/drive/entry` | 移入回收站 |
-| `PUT /api/drive/entry/restore` | 恢复软删除文件 |
-| `POST /api/drive/entry/rename` | 重命名或调整相对路径 |
-
-页面访问和设备令牌使用原有用户、令牌与权限系统。普通设备令牌不能伪装成管理台登录会话访问这些接口。已有 REST / WebSocket 路由保留，便于旧客户端继续同步。
-
-配套的桌面客户端 0.2.0 会识别能力接口，将新文件统一作为二进制传输，内容摘要使用完整 SHA-256；已有旧文本资源继续兼容。服务端会验证采用 SHA-256 的 WebSocket 上传内容及大小。原有 32 位路径摘要仍保留兼容，发生路径冲突时拒绝覆盖。
-
-文件库改名后，需要同步更新桌面端对应任务。管理台提供通用文件操作、设备令牌和备份配置；不包含旧界面的在线内容编辑、Git 同步设置、管理员用户管理和完整系统配置编辑器，这些底层 API 仍保留。OIDC 登录入口和基础公开文件读取页已适配；高级 Stytch 授权页面尚未重建。
-
-## 开发
-
-```sh
-cd web
-npm ci
-npm test
-npm run check
-npm run build
-cd ..
-CGO_ENABLED=0 go test ./internal/routers/api_router ./internal/routers/websocket_router ./internal/middleware ./internal/service ./pkg/util ./pkg/storage/local_fs
-CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o fast-folder-sync-service .
-```
-
-需要 Node.js 24 与 Go 1.26 或更新版本。前端源码位于 `web/`，构建输出位于 `frontend/`，由 Go 程序嵌入。`npm run preview` 提供 `127.0.0.1:4173` 本地静态页面，并代理 API 到 `FFS_PROXY_TARGET`（默认 `http://127.0.0.1:9000`）；需先启动 Go 服务。
-
-验证记录见 [VALIDATION.folder.md](VALIDATION.folder.md)。本地预览和联调使用独立测试目录，没有修改用户已有部署，也没有向远端仓库推送代码。
+完整产品与部署流程见[仓库 README](../README.md)，源码构建和接口说明见[服务端开发说明](../docs/SERVER-DEVELOPMENT.md)，本版本验证见[0.2.2 验证记录](../docs/VALIDATION-0.2.2.md)。服务内核保留上游 3.6.1，与产品版本分别管理。

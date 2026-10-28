@@ -2,7 +2,7 @@
 
 ## 当前基线
 
-- 产品版本：`0.2.1`，根目录 `VERSION` 是唯一版本来源。
+- 产品版本：`0.2.2`，根目录 `VERSION` 是唯一版本来源。
 - `main` 保存已完成检查的代码；日常开发使用 `feature/描述`、修复使用 `fix/描述`。
 - `v0.2.0` 对应首个完整源码提交 `c7ed1a39aff150a6fbbd334b1b349245cf550f60`，与已交付应用代码一致。
 - 发布标签固定指向当时的提交，不移动或覆盖已有标签；修复后发布新版本。
@@ -27,7 +27,7 @@ git push -u origin feature/folder-feature
 ## 准备发布
 
 ```sh
-npm run version:set -- 0.2.1
+npm run version:set -- 0.2.2
 npm run version:check
 npm run desktop:check
 npm run desktop:test
@@ -48,12 +48,12 @@ go test ./internal/routers/api_router ./internal/routers/websocket_router ./inte
 检查完成后提交所有预期变更，推送并确认 GitHub Actions 通过，再建立带说明的版本标签：
 
 ```sh
-git tag -a v0.2.1 -m "Folder Sync 0.2.1"
+git tag -a v0.2.2 -m "Folder Sync 0.2.2"
 git push origin main
-git push origin v0.2.1
+git push origin v0.2.2
 ```
 
-发行包可单独上传到 GitHub Release；不会随着代码提交自动上传。Linux / macOS 原生程序需要在对应平台验证。
+产品标签 `v<版本>` 会触发 `.github/workflows/release.yml`，检查通过后原生构建 Windows 客户端、Mac 两种架构和 Windows / Linux 服务端，生成 SHA-256 清单，再发布完整配套 Release。先合并检查通过的代码，再推送标签；普通源码提交不会自动发布。已有标签及历史 Release 保留原样。
 
 ## 查看与回退
 

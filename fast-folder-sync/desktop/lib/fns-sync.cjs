@@ -9,7 +9,7 @@ function serverUrl(base) {
   if (!['https:', 'http:', 'ws:', 'wss:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) throw Error('服务地址应为 http(s)://主机[:端口][/前缀]');
   url.protocol = ['https:', 'wss:'].includes(url.protocol) ? 'wss:' : 'ws:';
   url.pathname = url.pathname.replace(/\/$/, '') + '/api/user/sync';
-  url.search = new URLSearchParams({ lang: 'zh-cn', client: 'FastFolderSync', clientName: require('node:os').hostname(), clientVersion: '0.2.1', count: '0', pb: '0' }).toString();
+  url.search = new URLSearchParams({ lang: 'zh-cn', client: 'FastFolderSync', clientName: require('node:os').hostname(), clientVersion: '0.2.2', count: '0', pb: '0' }).toString();
   return url;
 }
 async function syncFns(task, dataDir, log = () => {}, signal) {
@@ -179,7 +179,7 @@ async function syncFns(task, dataDir, log = () => {}, signal) {
     if (envelope.vault && envelope.vault !== task.vault) return;
     if (envelope.context && envelope.context !== context && action !== 'Authorization' && action !== 'ClientInfo') return;
     if (action === 'Authorization') {
-      send('ClientInfo', { name: require('node:os').hostname(), type: 'FastFolderSync', version: '0.2.1', isDesktop: true, isMobile: false, isWin: process.platform === 'win32', isMacOS: process.platform === 'darwin', isLinux: process.platform === 'linux', protobuf: false, offlineSyncStrategy: 'manualMerge' });
+      send('ClientInfo', { name: require('node:os').hostname(), type: 'FastFolderSync', version: '0.2.2', isDesktop: true, isMobile: false, isWin: process.platform === 'win32', isMacOS: process.platform === 'darwin', isLinux: process.platform === 'linux', protobuf: false, offlineSyncStrategy: 'manualMerge' });
       const notes = [], files = [], delNotes = [], delFiles = [], missingNotes = [], missingFiles = [];
       for (const [name, entry] of Object.entries(snapshot.files)) {
         const item = { path: name, pathHash: rolling(name), contentHash: entry.contentHash, size: entry.size, mtime: Math.floor(entry.mtime), ctime: Math.floor(entry.ctime), ...(old.entries[name]?.contentHash !== undefined ? { baseHash: old.entries[name].contentHash } : { baseHashMissing: true }) };
