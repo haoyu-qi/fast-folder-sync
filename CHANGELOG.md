@@ -4,6 +4,14 @@
 
 ## 尚未发布
 
+## [0.2.2] - 2026-10-28
+
+- 网页管理台与桌面端统一为蓝紫毛玻璃风格，覆盖登录、概览、文件、备份、设备、回收站、存储、设置和弹窗。
+- 概览使用四项独立卡片，优化手机导航遮罩、键盘焦点、当前页面状态及无障碍显示偏好。
+- 无效或空计划时间使用明确占位，避免展示无效日期。
+- README 重写为产品说明与部署说明，更新截图、客户端安装、Docker / 原生部署、设备连接和升级流程。
+- 新增配套发布工作流，统一构建 Windows 客户端、Mac arm64 / x64 及 Windows / Linux 服务端，检查嵌入网页与产品版本并生成校验清单。
+
 ## [0.2.1] - 2026-10-28
 
 - 增加 Mac 专属毛玻璃客户端：原生 vibrancy、窗口控制、菜单栏模板图标、系统浅深主题、任务搜索筛选和 ⌘N / ⌘F / ⌘1～3 快捷键。
@@ -25,3 +33,4 @@
 
 [0.2.0]: https://github.com/haoyu-qi/fast-folder-sync/tree/v0.2.0
 [0.2.1]: https://github.com/haoyu-qi/fast-folder-sync/releases/tag/v0.2.1
+[0.2.2]: https://github.com/haoyu-qi/fast-folder-sync/releases/tag/v0.2.2

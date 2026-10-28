@@ -8,7 +8,7 @@ const current = fs.readFileSync(versionPath, 'utf8').trim();
 const valid = value => /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$/.test(value);
 const packagePaths = ['fast-folder-sync/desktop', 'fast-folder-sync-service/web'];
 const markers = [
-  ['README.md', /当前改造版本：\*\*([^*]+)\*\*/g],
+  ['README.md', /当前版本：\*\*([^*]+)\*\*/g],
   ['fast-folder-sync-service/compose.folder.yaml', /image: fast-folder-sync-service:([^\s]+)/g],
   ['fast-folder-sync/desktop/index.html', /Fast Folder Sync · v([^<\s]+)/g],
   ['fast-folder-sync/desktop/mac/index.html', /<span>v([^<\s]+)<\/span>/g],

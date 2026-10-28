@@ -9,7 +9,7 @@ export function url(route, query = {}) {
   return result.toString();
 }
 export async function request(route, { method = 'GET', body, query, binary = false, signal } = {}) {
-  const headers = { 'x-client': 'WebGui', 'x-client-name': 'Folder Sync Console', 'x-client-version': '0.2.1' };
+  const headers = { 'x-client': 'WebGui', 'x-client-name': 'Folder Sync Console', 'x-client-version': '0.2.2' };
   const user = session(); if (user?.token) headers.token = user.token;
   if (body && !(body instanceof FormData)) headers['Content-Type'] = 'application/json';
   const response = await fetch(url(route, query), { method, headers, body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined, signal });
@@ -27,7 +27,8 @@ export function bytes(value = 0) {
   if (!value) return '0 B'; const unit = Math.min(4, Math.floor(Math.log(value) / Math.log(1024)));
   return (value / 1024 ** unit).toLocaleString('zh-CN', { maximumFractionDigits: unit ? 1 : 0 }) + ' ' + ['B', 'KB', 'MB', 'GB', 'TB'][unit];
 }
-export function timestamp(value) {
-  if (!value || new Date(value).getFullYear() < 2000) return '尚未运行';
-  return new Date(value).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+export function timestamp(value, fallback = '尚未运行') {
+  const date = new Date(value);
+  if (!value || Number.isNaN(date.getTime()) || date.getFullYear() < 2000) return fallback;
+  return date.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
 }

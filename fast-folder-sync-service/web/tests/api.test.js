@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { request, url, bytes, list, saveSession, session } from '../src/api.js';
+import { request, url, bytes, list, saveSession, session, timestamp } from '../src/api.js';
 const local = new Map(), sessionValues = new Map();
 globalThis.localStorage = { getItem: k => local.get(k) || null, setItem: (k, v) => local.set(k, v) };
 globalThis.sessionStorage = { getItem: k => sessionValues.get(k) || null, setItem: (k, v) => sessionValues.set(k, v), removeItem: k => sessionValues.delete(k) };
@@ -28,4 +28,12 @@ test('expired authentication clears the browser session and surfaces a readable 
 });
 test('empty lists and byte counts render truthfully', () => {
   assert.deepEqual(list(undefined), []); assert.deepEqual(list({ list: [1] }), [1]); assert.equal(bytes(0), '0 B'); assert.equal(bytes(1024), '1 KB');
+});
+
+test('unset or invalid schedules do not display a misleading date', () => {
+  for (const value of [undefined, null, 0, '', '0001-01-01T00:00:00Z', 'invalid']) {
+    assert.equal(timestamp(value), '尚未运行');
+    assert.equal(timestamp(value, '待安排'), '待安排');
+  }
+  assert.match(timestamp('2026-10-28T10:30:00Z'), /10\/28/);
 });
