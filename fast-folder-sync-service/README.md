@@ -24,14 +24,15 @@
 
 ### Docker 部署包与 Compose
 
-部署包附带 Compose、环境变量示例、Dockerfile 和干净源码，解压后无需安装 Go 或 Node.js。需要 Docker Compose v2，首次构建需要联网。包内不包含离线镜像、预设账户或运行数据。
+部署包附带 Compose、环境变量示例、Dockerfile 和干净源码，解压后无需安装 Go 或 Node.js。需要 Docker Compose v2，默认拉取预构建 linux/amd64 镜像，无需编译。镜像地址为 `ghcr.io/haoyu-qi/fast-folder-sync-service:0.2.2`。发布页另提供可 `docker load` 导入的镜像压缩包与校验文件，步骤见下方 Docker 部署说明。部署 ZIP 不含预设账户或运行数据。
 
 在解压目录执行：
 
 ```sh
 cp .env.example .env
 docker compose config
-docker compose up -d --build --wait --wait-timeout 180
+docker compose pull
+docker compose up -d --wait --wait-timeout 180
 ```
 
 Windows PowerShell 使用 `Copy-Item .env.example .env`。源码仓库也可进入 `deploy/docker/` 执行相同命令。配置和数据保存在 Compose 文件旁的 `config/`、`storage/`，时区默认 `Asia/Shanghai`；端口、监听地址和时区可在 `.env` 调整。配置含健康检查、日志轮转与自动重启。

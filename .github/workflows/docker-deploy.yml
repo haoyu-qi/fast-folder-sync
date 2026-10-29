@@ -21,7 +21,7 @@ jobs:
           cp work/docker-smoke/.env.example work/docker-smoke/.env
           docker compose -f work/docker-smoke/compose.yaml config --quiet
       - name: Build and start the packaged source
-        run: docker compose -f work/docker-smoke/compose.yaml up -d --build --wait --wait-timeout 180
+        run: docker compose -f work/docker-smoke/compose.yaml -f work/docker-smoke/compose.build.yaml up -d --build --pull never --wait --wait-timeout 180
       - name: Check version, UI and persisted data
         shell: bash
         run: |

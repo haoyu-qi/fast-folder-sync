@@ -23,9 +23,9 @@ with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as archive:
             continue
         data = subprocess.check_output(["git", "show", f"HEAD:{filename}"], cwd=root)
         archive.writestr("source/" + relative, data)
-    for name in ["compose.yaml", ".env.example", "README.md"]:
+    for name in ["compose.yaml", "compose.build.yaml", ".env.example", "README.md"]:
         text = (root / "deploy/docker" / name).read_text(encoding="utf-8")
-        if name == "compose.yaml":
+        if name == "compose.build.yaml":
             text = text.replace("../../fast-folder-sync-service", "./source")
         archive.writestr(name, text.encode("utf-8"))
     for name in ["LICENSE", "NOTICE.md"]:

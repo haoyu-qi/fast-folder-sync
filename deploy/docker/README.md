@@ -1,20 +1,34 @@
 # Folder Sync Docker 部署包
 
-需要 Docker Engine / Docker Desktop 和 Docker Compose v2。包内附带干净源码，首次部署需联网下载 Node、Go、Alpine 镜像和构建依赖；这是源码构建部署包，不含离线镜像，宿主机无需安装 Node.js、Go 或数据库。
+需要 Docker Engine / Docker Desktop 和 Docker Compose v2。默认使用预构建镜像，无需在服务器编译源码。当前发布平台为 **linux/amd64（x86_64）**；ARM64 主机请勿直接使用本镜像。
 
 ## 目录与启动
 
-部署 ZIP 包含 `compose.yaml`、`.env.example`、本说明、源码提交记录 `BUILD-INFO.json`、许可及 `source/` 服务端源码。首次启动后会在旁边生成 `config/` 和 `storage/`。
+部署 ZIP 包含 `compose.yaml`、源码构建覆盖文件 `compose.build.yaml`、`.env.example`、本说明、源码提交记录 `BUILD-INFO.json`、许可及 `source/` 服务端源码。首次启动后会在旁边生成 `config/` 和 `storage/`。
 
 解压到固定目录，在该目录执行：
 
 ```sh
 cp .env.example .env
 docker compose config
-docker compose up -d --build --wait --wait-timeout 180
+docker compose pull
+docker compose up -d --wait --wait-timeout 180
 ```
 
-Windows PowerShell 将第一条换为 `Copy-Item .env.example .env`。首次构建可能需要数分钟，等待时间参数只计算容器启动后的健康等待。在源码仓库中也可直接进入 `deploy/docker/` 执行以上命令；仓库配置从 `../../fast-folder-sync-service` 构建，ZIP 中自动改为 `./source`。
+Windows PowerShell 将第一条换为 `Copy-Item .env.example .env`。仓库中也可进入 `deploy/docker/` 执行以上命令。镜像地址为 `ghcr.io/haoyu-qi/fast-folder-sync-service:0.2.2`。
+
+### 直接下载镜像并导入
+
+镜像压缩包：[Linux amd64 镜像](https://github.com/haoyu-qi/fast-folder-sync/releases/download/v0.2.2/Folder-Sync-Server-0.2.2-Docker-Image-linux-amd64.tar.gz)。部署文件：[Docker 部署包](https://github.com/haoyu-qi/fast-folder-sync/releases/download/v0.2.2/Folder-Sync-Server-0.2.2-Docker.zip)。同发布页附镜像和部署包各自的 SHA-256 清单。
+
+下载后在部署目录执行：
+
+```sh
+docker load -i Folder-Sync-Server-0.2.2-Docker-Image-linux-amd64.tar.gz
+docker compose up -d --pull never --wait --wait-timeout 180
+```
+
+`docker load` 会恢复同名版本标签，导入后无需访问 GHCR。不要修改 `.env` 中版本号，除非导入了对应的新版本镜像。
 
 打开 `http://127.0.0.1:9000/webgui/`，其他电脑访问 `http://主机IP:9000/webgui/`。创建首个账户与文件库，再到「连接设备」签发令牌；桌面端填写服务根地址、文件库名和令牌。首个账户建立后默认关闭公开注册。
 
@@ -25,9 +39,9 @@ Windows PowerShell 将第一条换为 `Copy-Item .env.example .env`。首次构�
 | `FFS_BIND_IP` | `0.0.0.0` | 接受其他设备连接；仅本机访问时改为 `127.0.0.1` |
 | `FFS_PORT` | `9000` | 主机端口，容器内保持 9000 |
 | `TZ` | `Asia/Shanghai` | 备份计划使用的服务端时区 |
-| `FFS_VERSION` | `0.2.2` | 本地镜像标签；修改它不会下载新版源码 |
+| `FFS_VERSION` | `0.2.2` | 已发布镜像版本；离线使用时与导入镜像版本一致 |
 
-修改端口或时区后执行 `docker compose up -d --wait --wait-timeout 180`。已配置自动重启、健康检查、30 秒停止等待和日志轮转。本包不指定 `platform`，按 Docker 主机架构构建；实际验证架构以 CI 记录为准。
+修改端口或时区后执行 `docker compose up -d --wait --wait-timeout 180`。已配置自动重启、健康检查、30 秒停止等待和日志轮转。预构建镜像只发布并验证 linux/amd64。
 
 ## 持久化、备份与恢复
 
@@ -57,7 +71,7 @@ docker compose down
 
 `down` 移除容器与网络，主机绑定的配置和数据目录保留。重新启动使用 `docker compose up -d --wait --wait-timeout 180`。
 
-升级前停服并备份数据和 `.env`。将新版包的 `source/`、Compose 文件及说明替换到原部署目录，保留原 `config/`、`storage/`，对照新版 `.env.example` 核对原 `.env`；执行 `docker compose up -d --build --wait --wait-timeout 180`。检查日志、登录与文件库后再恢复客户端同步。镜像从本地源码构建，不能通过 `docker compose pull` 升级。
+升级前停服并备份数据和 `.env`。将新版部署文件及说明替换到原部署目录，保留原 `config/`、`storage/`，对照新版 `.env.example` 核对原 `.env`；执行 `docker compose up -d --build --wait --wait-timeout 180`。检查日志、登录与文件库后再恢复客户端同步。在线部署通过 `docker compose pull` 获取 `.env` 所选版本；离线部署先导入新版镜像，再更新 `.env` 并启动。
 
 已有 `compose.folder.yaml` 命名卷部署继续使用原配置和原卷。本包的绑定目录不会自动读取命名卷；迁移时先停服、导出原配置与数据，再导入对应目录，不能直接切换到空目录启动。
 
@@ -68,3 +82,13 @@ docker compose down
 - 反向代理需支持 HTTP 和 `/api/user/sync` 的 WebSocket 升级。对外 API 地址可配置 `server.ext-api-url`，HTTPS 由实际代理配置。
 - 浏览器单次上传请求上限为 512 MiB，代理的请求上限和超时需匹配。
 - 云存储先在服务配置启用类型，再到网页「存储位置」验证并保存，最后创建备份任务。
+
+## 可选：从源码构建
+
+有需要时显式加载覆盖文件：
+
+```sh
+docker compose -f compose.yaml -f compose.build.yaml up -d --build --pull never --wait --wait-timeout 180
+```
+
+首次源码构建需联网下载基础镜像及依赖；仓库覆盖文件使用 `../../fast-folder-sync-service`，部署 ZIP 使用附带的 `./source`。

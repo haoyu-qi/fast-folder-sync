@@ -1,10 +1,7 @@
 name: fast-folder-sync
 services:
   folder-sync:
-    build:
-      context: ../../fast-folder-sync-service
-      dockerfile: docker/Dockerfile.folder
-    image: fast-folder-sync-service:${FFS_VERSION:-0.2.2}
+    image: ghcr.io/haoyu-qi/fast-folder-sync-service:${FFS_VERSION:-0.2.2}
     restart: unless-stopped
     init: true
     stop_grace_period: 30s
