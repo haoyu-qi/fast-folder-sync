@@ -2,6 +2,7 @@
 // Obsidian runtime is intentionally absent; see docs/desktop.md for compatibility.
 const WebSocket = require('ws');
 const { randomUUID } = require('node:crypto');
+const { filePathKeys, remoteFilePathKeys } = require('./path-keys.cjs');
 const { fs, path, excluded, safePath, statOrNull, scan, digest, rolling, wireHash, readJson, atomicJson, replaceFromFile, removeFile } = require('./files.cjs');
 
 function serverUrl(base) {
@@ -9,15 +10,16 @@ function serverUrl(base) {
   if (!['https:', 'http:', 'ws:', 'wss:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) throw Error('服务地址应为 http(s)://主机[:端口][/前缀]');
   url.protocol = ['https:', 'wss:'].includes(url.protocol) ? 'wss:' : 'ws:';
   url.pathname = url.pathname.replace(/\/$/, '') + '/api/user/sync';
-  url.search = new URLSearchParams({ lang: 'zh-cn', client: 'FastFolderSync', clientName: require('node:os').hostname(), clientVersion: '0.2.2', count: '0', pb: '0' }).toString();
+  url.search = new URLSearchParams({ lang: 'zh-cn', client: 'FastFolderSync', clientName: require('node:os').hostname(), clientVersion: '0.3.0', count: '0', pb: '0' }).toString();
   return url;
 }
-async function syncFns(task, dataDir, log = () => {}, signal) {
+async function syncFns(task, dataDir, log = () => {}, signal, onProgress = () => {}) {
   if (task.mode !== 'sync') throw Error('私有同步服务当前使用双向同步模式；单向备份请选择本地目标');
   if (!task.vault || !task.token) throw Error('请填写服务端仓库名和访问令牌');
   const stateFile = path.join(dataDir, 'state', task.id + '.json');
   const old = await readJson(stateFile, { entries: {}, times: {}, dirs: [] });
   let generic = old.generic === true;
+  onProgress({ stage: 'probe' });
   const capabilityURL = serverUrl(task.server);
   capabilityURL.protocol = capabilityURL.protocol === 'wss:' ? 'https:' : 'http:';
   capabilityURL.pathname = capabilityURL.pathname.replace(/\/api\/user\/sync$/, '/api/drive/capabilities'); capabilityURL.search = '';
@@ -26,12 +28,24 @@ async function syncFns(task, dataDir, log = () => {}, signal) {
     const response = await fetch(capabilityURL, { signal: probeSignal });
     if (response.ok) { const body = await response.json(); generic = generic || (body.status === true && body.data?.binaryOnly === true && body.data?.fileContentHash === 'sha256'); }
   } catch { signal?.throwIfAborted(); }
+  let remoteKeys = new Map();
+  if (generic) {
+    log('info', '正在读取服务端文件索引，保留已有路径标识并检查路径冲突');
+    onProgress({ stage: 'index', checked: 0 });
+    remoteKeys = await remoteFilePathKeys(task, serverUrl(task.server), signal, onProgress);
+  }
   const notePaths = new Set(Object.keys(old.entries).filter(name => old.entries[name].kind === 'Note'));
-  const snapshot = await scan(task.source, task.excludes, true, signal, { binaryOnly: generic, strongFiles: generic, notePaths });
+  log('info', '正在扫描源文件夹并校验内容，大文件首次扫描可能需要较长时间');
+  const snapshot = await scan(task.source, task.excludes, true, signal, { binaryOnly: generic, strongFiles: generic, notePaths, onProgress });
+  log('info', `源文件夹扫描完成：${Object.keys(snapshot.files).length} 个文件；正在连接同步服务`);
+  onProgress({ stage: 'connect', checked: Object.keys(snapshot.files).length });
   if (generic) log('info', '通用文件服务已识别，使用完整 SHA-256 与二进制传输');
   const pathHashes = new Map();
+  const fileKeys = generic ? filePathKeys(Object.keys(snapshot.files).filter(name => snapshot.files[name].kind === 'File'), old.entries, remoteKeys) : new Map();
+  const pathHash = (name, type = 'File') => generic && type === 'File' ? fileKeys.get(name) : rolling(name);
   for (const name of [...Object.keys(snapshot.files), ...snapshot.dirs, ...Object.keys(old.entries)]) {
-    const hash = rolling(name), existing = pathHashes.get(hash);
+    const type = snapshot.files[name]?.kind || old.entries[name]?.kind || 'Folder';
+    const hash = (generic ? type + ':' : '') + pathHash(name, type), existing = pathHashes.get(hash);
     if (existing && existing !== name) throw Error('服务端路径哈希发生冲突，无法安全同步: ' + existing + ' / ' + name);
     pathHashes.set(hash, name);
   }
@@ -41,7 +55,7 @@ async function syncFns(task, dataDir, log = () => {}, signal) {
   }
   const next = { entries: { ...old.entries }, times: { ...old.times }, dirs: snapshot.dirs, generic };
   // A scanned entry is only a baseline after the server completes reconciliation.
-  for (const [name, entry] of Object.entries(snapshot.files)) next.entries[name] = { hash: entry.hash, contentHash: entry.contentHash, kind: entry.kind };
+  for (const [name, entry] of Object.entries(snapshot.files)) next.entries[name] = { hash: entry.hash, contentHash: entry.contentHash, kind: entry.kind, ...(generic && entry.kind === 'File' ? { pathHash: pathHash(name) } : {}) };
   const historyDir = path.join(dataDir, 'history', task.id);
   const tempDir = path.join(dataDir, 'transfers', randomUUID());
   await fs.mkdir(tempDir, { recursive: true });
@@ -99,10 +113,11 @@ async function syncFns(task, dataDir, log = () => {}, signal) {
     await replaceFromFile(task.source, name, sourceFile, { historyDir, side: 'source', expectedHash: local?.hash ?? null, mtime: data.mtime });
     const full = await safePath(task.source, name), s = await fs.stat(full);
     const hash = await digest(full);
-    next.entries[name] = { hash, contentHash: type === 'File' && generic ? hash : await wireHash(full, s.size, type), kind: type };
+    next.entries[name] = { hash, contentHash: type === 'File' && generic ? hash : await wireHash(full, s.size, type), kind: type, ...(generic && type === 'File' ? { pathHash: data.pathHash || pathHash(name) } : {}) };
     result.downloaded++; log('success', '下载 ' + name); complete(type, pageIndex);
   }
   async function upload(data, pageIndex) {
+    onProgress({ stage: 'upload', path: data.path, fileBytes: 0, fileSize: snapshot.files[data.path]?.size, uploaded: result.uploaded, downloaded: result.downloaded });
     const local = await localMeta(data.path);
     if (!local) throw Error('待上传文件已消失: ' + data.path);
     if (!/^[0-9a-f-]{36}$/i.test(data.sessionId) || !Number.isSafeInteger(data.chunkSize) || data.chunkSize < 1 || data.chunkSize > 8 * 1024 * 1024) throw Error('无效的上传分块参数');
@@ -124,6 +139,7 @@ async function syncFns(task, dataDir, log = () => {}, signal) {
         }
         while (ws.bufferedAmount > 4 * 1024 * 1024) { signal?.throwIfAborted(); if (finished) throw Error('同步已停止'); await new Promise(r => setTimeout(r, 20)); }
         await new Promise((resolve, reject) => ws.send(frame, err => err ? reject(err) : resolve())); touch();
+        onProgress({ stage: 'upload', path: data.path, fileBytes: Math.min((i + 1) * data.chunkSize, local.s.size), fileSize: local.s.size, uploaded: result.uploaded, downloaded: result.downloaded });
       }
       if (await digest(local.file) !== before.hash) throw Error('上传期间文件内容变化: ' + data.path);
     } finally { await handle.close(); }
@@ -160,6 +176,8 @@ async function syncFns(task, dataDir, log = () => {}, signal) {
     let wrote = 0;
     while (wrote < length) { const { bytesWritten } = await session.handle.write(frame, 42 + wrote, length - wrote, index * session.chunkSize + wrote); if (!bytesWritten) throw Error('写入下载分块失败'); wrote += bytesWritten; }
     session.chunks.add(index);
+    session.received = (session.received || 0) + length;
+    onProgress({ stage: 'download', path: session.path, fileBytes: session.received, fileSize: session.size, uploaded: result.uploaded, downloaded: result.downloaded });
     if (session.chunks.size === session.totalChunks) await finishDownload(session);
   }
   const batches = new Map();
@@ -168,7 +186,9 @@ async function syncFns(task, dataDir, log = () => {}, signal) {
     const deleteKey = { Note: 'delNotes', File: 'delFiles', Folder: 'delFolders' }[type];
     const missingKey = { Note: 'missingNotes', File: 'missingFiles', Folder: 'missingFolders' }[type];
     const count = Math.max(1, Math.ceil(Math.max(items.length, deletions.length, missing.length) / 100));
-    const list = Array.from({ length: count }, (_, index) => ({ [plural]: items.slice(index * 100, (index + 1) * 100), [deleteKey]: deletions.slice(index * 100, (index + 1) * 100), [missingKey]: missing.slice(index * 100, (index + 1) * 100), lastTime: old.times[type] || 0, batchIndex: index, totalBatches: count }));
+    // A complete local manifest needs a complete remote manifest. An incremental
+    // remote list would make unchanged local files look new and re-upload them.
+    const list = Array.from({ length: count }, (_, index) => ({ [plural]: items.slice(index * 100, (index + 1) * 100), [deleteKey]: deletions.slice(index * 100, (index + 1) * 100), [missingKey]: missing.slice(index * 100, (index + 1) * 100), lastTime: generic ? 0 : old.times[type] || 0, batchIndex: index, totalBatches: count }));
     batches.set(type, list); send(type + 'Sync', list[0]);
   }
   async function message(action, envelope) {
@@ -179,16 +199,17 @@ async function syncFns(task, dataDir, log = () => {}, signal) {
     if (envelope.vault && envelope.vault !== task.vault) return;
     if (envelope.context && envelope.context !== context && action !== 'Authorization' && action !== 'ClientInfo') return;
     if (action === 'Authorization') {
-      send('ClientInfo', { name: require('node:os').hostname(), type: 'FastFolderSync', version: '0.2.2', isDesktop: true, isMobile: false, isWin: process.platform === 'win32', isMacOS: process.platform === 'darwin', isLinux: process.platform === 'linux', protobuf: false, offlineSyncStrategy: 'manualMerge' });
+      onProgress({ stage: 'compare', checked: Object.keys(snapshot.files).length });
+      send('ClientInfo', { name: require('node:os').hostname(), type: 'FastFolderSync', version: '0.3.0', isDesktop: true, isMobile: false, isWin: process.platform === 'win32', isMacOS: process.platform === 'darwin', isLinux: process.platform === 'linux', protobuf: false, offlineSyncStrategy: 'manualMerge' });
       const notes = [], files = [], delNotes = [], delFiles = [], missingNotes = [], missingFiles = [];
       for (const [name, entry] of Object.entries(snapshot.files)) {
-        const item = { path: name, pathHash: rolling(name), contentHash: entry.contentHash, size: entry.size, mtime: Math.floor(entry.mtime), ctime: Math.floor(entry.ctime), ...(old.entries[name]?.contentHash !== undefined ? { baseHash: old.entries[name].contentHash } : { baseHashMissing: true }) };
+        const item = { path: name, pathHash: pathHash(name, entry.kind), contentHash: entry.contentHash, size: entry.size, mtime: Math.floor(entry.mtime), ctime: Math.floor(entry.ctime), ...(old.entries[name]?.contentHash !== undefined ? { baseHash: old.entries[name].contentHash } : { baseHashMissing: true }) };
         (entry.kind === 'Note' ? notes : files).push(item);
       }
       for (const name of Object.keys(old.entries)) if (!snapshot.files[name] && allowed(name)) {
         const note = old.entries[name].kind === 'Note';
         const list = task.propagateDeletes ? (note ? delNotes : delFiles) : (note ? missingNotes : missingFiles);
-        list.push({ path: name, pathHash: rolling(name) });
+        list.push({ path: name, pathHash: pathHash(name, note ? 'Note' : 'File') });
       }
       startType('Folder', snapshot.dirs.map(name => ({ path: name, pathHash: rolling(name) })), []);
       startType('Note', notes, delNotes, missingNotes); startType('File', files, delFiles, missingFiles);
@@ -223,7 +244,7 @@ async function syncFns(task, dataDir, log = () => {}, signal) {
     if (action === 'NoteModifyAck' || action === 'FileUploadAck') {
       const item = pending.get(type + ':' + name);
       if (!item) throw Error('收到未请求的上传确认');
-      next.entries[name] = { hash: item.hash, contentHash: item.contentHash, kind: type }; pending.delete(type + ':' + name);
+      next.entries[name] = { hash: item.hash, contentHash: item.contentHash, kind: type, ...(generic && type === 'File' ? { pathHash: pathHash(name) } : {}) }; pending.delete(type + ':' + name);
       result.uploaded++; log('success', '上传 ' + name); complete(type, item.pageIndex); return;
     }
     if (action === 'NoteSyncModify') {
@@ -232,7 +253,7 @@ async function syncFns(task, dataDir, log = () => {}, signal) {
     }
     if (action === 'FileSyncUpdate') {
       if (sessions.has('path:' + name)) throw Error('重复的下载请求');
-      sessions.set('path:' + name, { ...data, pageIndex }); send('FileChunkDownload', { path: name, pathHash: rolling(name) }); return;
+      sessions.set('path:' + name, { ...data, pageIndex }); send('FileChunkDownload', { path: name, pathHash: data.pathHash || pathHash(name) }); return;
     }
     if (action === 'FileSyncChunkDownload') return downloadMeta(data);
     if (action.endsWith('SyncDelete')) {

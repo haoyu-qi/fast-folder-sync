@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Fast Folder Sync · Agent Sync 记忆工作台</title><link rel="stylesheet" href="agent.css"><script src="agent-renderer.js" defer></script>
+</head>
+<body>
+  <div class="dragbar">Agent Sync</div>
+  <aside><div class="brand"><span class="brand-symbol">↔</span><strong>Agent Sync<small>个人记忆工作台</small></strong></div>
+    <nav aria-label="主导航"><button data-tab="memories" aria-current="page">◈ 共享记忆 <span id="memory-count">0</span></button><button data-tab="projects">▧ 项目与 Agent</button><button data-tab="sources">⌕ 记忆来源</button><button data-tab="devices">⇄ 设备同步</button><button data-tab="model">✧ 自动整理</button></nav>
+    <div class="aside-note"><strong>少交代一次，多接着做。</strong><p>Codex · Claude Code · ZCode · WorkBuddy<br>记忆随你，在不同电脑间延续。</p><span>LOCAL FIRST / v0.3.0</span></div>
+    <button id="files" class="subtle">← 返回文件同步与备份</button><button id="data" class="subtle">打开应用数据目录</button>
+  </aside>
+  <main>
+    <header><div><div class="eyebrow">YOUR CONTEXT, EVERYWHERE</div><h1 id="heading">共享记忆</h1><p id="description">换电脑、换 Agent，也能接着理解你。</p></div><div class="actions"><label class="check"><input type="checkbox" id="auto" checked> 自动同步</label><button id="cycle" class="primary">整理并同步</button></div></header>
+    <div id="overview" class="stats"></div>
+    <div id="issues" role="status"></div>
+    <section id="memories-panel"><div class="toolbar"><input id="search" type="search" placeholder="搜索原文、摘要或来源" aria-label="搜索记忆"><select id="scope" aria-label="按项目筛选"><option value="">所有项目</option></select><label class="check"><input id="show-deleted" type="checkbox">显示已删除</label></div><div id="memory-list"></div></section>
+    <section id="projects-panel" hidden><div class="panel"><h2>让同一个项目在不同电脑上对应起来</h2><p>先创建共享项目；其他电脑同步后，选择已有项目并关联本机目录。</p><form id="project-form" class="inline"><input id="project-name" maxlength="100" placeholder="例如：官网改版" required aria-label="新项目名称"><button class="primary">创建共享项目</button></form></div><div class="panel"><h2>关联本机项目</h2><form id="binding-form"><label>共享项目<select id="binding-project" required></select></label><label>本机目录<div class="inline"><input id="binding-path" readonly required placeholder="选择本机项目目录"><button type="button" id="pick-project">选择目录</button></div></label><fieldset><legend>提供给哪些 Agent</legend><label class="check"><input type="checkbox" name="agent" value="codex" checked>Codex</label><label class="check"><input type="checkbox" name="agent" value="claude" checked>Claude Code</label><label class="check"><input type="checkbox" name="agent" value="zcode" checked>ZCode</label><label class="check"><input type="checkbox" name="agent" value="workbuddy" checked>WorkBuddy</label></fieldset><p>关联后点击“提供记忆”，为所选 Agent 安装可撤销的读取入口。</p><button class="primary">保存关联</button></form></div><div id="binding-list"></div></section>
+    <section id="sources-panel" hidden><div class="panel"><h2>只带走你选择的内容</h2><p>识别已有记忆和规则，预览后勾选。每个来源都需要指定所属项目；个人规则可选“个人通用”。不会采集聊天记录、Skills 或登录配置。</p><div class="actions"><button id="detect" class="primary">识别本机 Agent</button><button id="save-sources">保存选择并采集</button></div><div id="source-list" class="source-list"></div></div></section>
+    <section id="devices-panel" hidden><div class="panel"><h2>连接另一台电脑</h2><p>各电脑使用同一个专用文件库或共享目录，再关联各自的本机项目。记忆正文会同步到所选位置；凭据和本机项目路径配置留在本机。</p><form id="connection-form"><label>同步方式<select id="connection-backend"><option value="fns">Folder Sync 私有服务</option><option value="local">已挂载的共享目录 / 移动磁盘</option></select></label><div id="server-fields"><label>服务根地址<input id="connection-server" type="url" placeholder="https://sync.example.com"></label><label>专用文件库名称<input id="connection-vault" placeholder="agent-memory"></label><label>本机设备令牌<input id="connection-token" type="password" autocomplete="off" placeholder="留空保留已保存令牌"></label></div><div id="directory-fields" hidden><label>专用共享目录<div class="inline"><input id="connection-target" readonly><button type="button" id="pick-target">选择目录</button></div></label><p>选择空目录，或另一台电脑已经使用的 Agent Sync 共享目录。</p></div><div class="actions"><button class="primary">保存连接</button><button type="button" id="disconnect-server">断开同步连接</button></div></form></div><div id="device-status" class="panel"></div></section>
+    <section id="model-panel" hidden><div class="panel"><h2>保留原文，整理成更好用的记忆</h2><p>将经验整理为主题摘要，规则保持原意。摘要始终从原文生成；模型不可用时继续无损同步。</p><form id="model-form"><label class="check"><input id="model-enabled" type="checkbox" checked> 自动进行语义整理</label><label>OpenAI 兼容服务地址<input id="model-base" type="url" placeholder="https://api.example.com/v1"></label><label>模型名称<input id="model-name" maxlength="200" placeholder="填写服务提供的模型 ID"></label><label>API Key<input id="model-key" type="password" autocomplete="off" placeholder="留空保留已保存密钥，本机服务可不填"></label><label class="check"><input id="model-clear" type="checkbox">清除已保存的密钥</label><p>配置后，选择的经验记忆原文会发送到此模型服务，可能产生费用。密钥通过操作系统加密，只保存在本机。</p><button class="primary">保存整理设置</button></form></div></section>
+    <footer>个人记忆与项目经验分开管理 · 原文可追溯 · 版本可恢复</footer>
+  </main>
+  <dialog id="detail-dialog" aria-labelledby="detail-title"><div class="dialog-head"><h2 id="detail-title">记忆详情</h2><button id="close-detail" aria-label="关闭">✕</button></div><div id="detail-body"></div></dialog>
+  <div id="toast" role="status" hidden></div>
+</body></html>

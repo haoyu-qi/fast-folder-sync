@@ -85,6 +85,34 @@ async function download(vault, entry) {
     await syncFns(taskA, dataA); await syncFns(taskB, dataB);
     assert.equal(hash(await fs.readFile(path.join(sourceB, 'large.bin'))), hash(large));
   });
+  await check('colliding file paths retain separate bytes and stable keys across two devices and deletion', async () => {
+    const names = ['同步/work/go-build/5a/5a7aa464a559d484fdf9c9f3b2b9fc6f4722935a59e2dbda9d23470e1b8c9cec-a', '灵境/lingjing-desktop/target/release/deps/indexmap-1d341a9dcad03b31.d'];
+    assert.equal(rolling(names[0]), rolling(names[1]));
+    await upload(library, 'Aa', Buffer.from('existing legacy bytes'));
+    const payloads = new Map([[names[0], Buffer.from('Go cache bytes')], [names[1], Buffer.from('Rust cache bytes')], ['BB', Buffer.from('new colliding bytes')]]);
+    for (const [name, bytes] of payloads) { await fs.mkdir(path.dirname(path.join(sourceA, name)), { recursive: true }); await fs.writeFile(path.join(sourceA, name), bytes); }
+    await syncFns(taskA, dataA); await syncFns(taskB, dataB);
+    let entries = (await api('/drive/entries', 'GET', undefined, { vault: library, pageSize: 100 })).list;
+    for (const [name, bytes] of payloads) {
+      const matches = entries.filter(entry => entry.path === name); assert.equal(matches.length, 1, name);
+      assert.match(matches[0].pathHash, /^[0-9a-f]{64}$/);
+      assert.deepEqual(await download(library, matches[0]), bytes);
+      assert.deepEqual(await fs.readFile(path.join(sourceB, name)), bytes);
+    }
+    assert.equal(entries.find(entry => entry.path === 'Aa').pathHash, rolling('Aa'));
+    assert.equal(await fs.readFile(path.join(sourceB, 'Aa'), 'utf8'), 'existing legacy bytes');
+    const stable = new Map(entries.map(entry => [entry.path, entry.pathHash]));
+    const unchanged = await syncFns(taskA, dataA); assert.equal(unchanged.uploaded, 0); assert.equal(unchanged.downloaded, 0);
+    await fs.writeFile(path.join(sourceA, names[1]), 'updated Rust bytes');
+    await syncFns(taskA, dataA); await syncFns(taskB, dataB);
+    assert.equal(await fs.readFile(path.join(sourceB, names[1]), 'utf8'), 'updated Rust bytes');
+    await fs.unlink(path.join(sourceA, names[0]));
+    await syncFns({ ...taskA, propagateDeletes: true }, dataA); await syncFns({ ...taskB, propagateDeletes: true }, dataB);
+    assert.equal(await fs.stat(path.join(sourceB, names[0])).catch(() => null), null);
+    assert.equal(await fs.readFile(path.join(sourceB, names[1]), 'utf8'), 'updated Rust bytes');
+    entries = (await api('/drive/entries', 'GET', undefined, { vault: library, pageSize: 100 })).list;
+    assert.equal(entries.find(entry => entry.path === names[1]).pathHash, stable.get(names[1]));
+  });
   await check('browser deletion and restoration preserve file bytes', async () => {
     const entry = (await api('/drive/entries', 'GET', undefined, { vault: library, keyword: '原始数据' })).list[0];
     await api('/drive/entry', 'DELETE', undefined, { vault: library, path: entry.path, pathHash: entry.pathHash, kind: entry.kind });

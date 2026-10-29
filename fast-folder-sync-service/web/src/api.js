@@ -9,7 +9,7 @@ export function url(route, query = {}) {
   return result.toString();
 }
 export async function request(route, { method = 'GET', body, query, binary = false, signal } = {}) {
-  const headers = { 'x-client': 'WebGui', 'x-client-name': 'Folder Sync Console', 'x-client-version': '0.2.2' };
+  const headers = { 'x-client': 'WebGui', 'x-client-name': 'Folder Sync Console', 'x-client-version': '0.3.0' };
   const user = session(); if (user?.token) headers.token = user.token;
   if (body && !(body instanceof FormData)) headers['Content-Type'] = 'application/json';
   const response = await fetch(url(route, query), { method, headers, body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined, signal });

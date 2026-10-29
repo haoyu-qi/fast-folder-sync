@@ -1,18 +1,22 @@
 const { fs, path, scan, safePath, digest, atomicJson, readJson, replaceFromFile, removeFile, validateRoots } = require('./files.cjs');
 
-async function syncLocal(task, dataDir, log = () => {}, signal) {
+async function syncLocal(task, dataDir, log = () => {}, signal, onProgress = () => {}) {
   await validateRoots(task.source, task.target);
   const historyDir = path.join(dataDir, 'history', task.id);
   const stateFile = path.join(dataDir, 'state', task.id + '.json');
   const previous = await readJson(stateFile, { entries: {}, dirs: [] });
-  const left = await scan(task.source, task.excludes, false, signal);
-  const right = await scan(task.target, task.excludes, false, signal);
+  log('info', '正在扫描源文件夹并校验内容，大文件首次扫描可能需要较长时间');
+  const left = await scan(task.source, task.excludes, false, signal, { onProgress });
+  log('info', `源文件夹扫描完成：${Object.keys(left.files).length} 个文件；正在扫描目标文件夹`);
+  const right = await scan(task.target, task.excludes, false, signal, { onProgress, stage: 'scan-target' });
+  onProgress({ stage: 'compare', checked: Object.keys(left.files).length });
   const next = { entries: {}, dirs: [], time: new Date().toISOString() };
   const result = { uploaded: 0, downloaded: 0, deleted: 0, conflicts: 0, files: Object.keys(left.files).length };
   const names = new Set([...Object.keys(left.files), ...Object.keys(right.files), ...Object.keys(previous.entries)]);
   const roots = { source: task.source, target: task.target };
   async function copy(name, from, to, value, old) {
     signal?.throwIfAborted();
+    onProgress({ stage: 'copy', path: name, uploaded: result.uploaded, downloaded: result.downloaded });
     const src = await safePath(roots[from], name);
     if (await digest(src) !== value.hash) throw Error('源文件已变化: ' + name);
     await replaceFromFile(roots[to], name, src, { historyDir, side: to, expectedHash: old?.hash ?? null, contentHash: value.hash, mtime: value.mtime });

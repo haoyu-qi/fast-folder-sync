@@ -1,0 +1,32 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const os = require('node:os');
+const { fs, path, scan, digest } = require('../lib/files.cjs');
+const { syncLocal } = require('../lib/local-sync.cjs');
+
+test('scan reports actual checked files and SHA-256 bytes, excluding ignored files', async t => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ffs-progress-'));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  const source = path.join(root, 'source'), target = path.join(root, 'target');
+  await fs.mkdir(source); await fs.mkdir(target);
+  const bytes = Buffer.alloc(2 * 1024 * 1024, 42);
+  await fs.writeFile(path.join(source, 'large.bin'), bytes);
+  await fs.writeFile(path.join(source, 'ignored.txt'), 'ignored');
+  await fs.writeFile(path.join(source, 'empty'), '');
+  const events = [];
+  await scan(source, ['ignored.txt'], false, undefined, { onProgress: event => events.push(event) });
+  assert.equal(events[0].checked, 0);
+  assert.equal(events.at(-1).checked, 2);
+  assert.equal(events.at(-1).bytes, bytes.length);
+  assert.ok(events.every(event => event.stage === 'scan-source'));
+  let read = 0, chunks = 0;
+  await digest(path.join(source, 'large.bin'), undefined, count => { read += count; chunks++; });
+  assert.equal(read, bytes.length); assert.ok(chunks > 1);
+  const stages = [];
+  const result = await syncLocal({ id: 'progress', source, target, mode: 'backup', excludes: ['ignored.txt'] }, path.join(root, 'data'), undefined, undefined, event => stages.push(event));
+  assert.equal(result.uploaded, 2);
+  for (const stage of ['scan-source', 'scan-target', 'compare', 'copy']) assert.ok(stages.some(event => event.stage === stage), stage);
+  assert.deepEqual(await fs.readFile(path.join(target, 'large.bin')), bytes);
+  const controller = new AbortController();
+  await assert.rejects(digest(path.join(source, 'large.bin'), controller.signal, () => controller.abort()), { name: 'AbortError' });
+});

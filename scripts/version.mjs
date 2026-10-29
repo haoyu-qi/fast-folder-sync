@@ -12,6 +12,7 @@ const markers = [
   ['fast-folder-sync-service/compose.folder.yaml', /image: fast-folder-sync-service:([^\s]+)/g],
   ['deploy/docker/compose.yaml', /FFS_VERSION:-([^}]+)/g],
   ['deploy/docker/.env.example', /FFS_VERSION=([^\s]+)/g],
+  ['fast-folder-sync/desktop/agent.html', /LOCAL FIRST \/ v([^<\s]+)/g],
   ['fast-folder-sync/desktop/index.html', /Fast Folder Sync · v([^<\s]+)/g],
   ['fast-folder-sync/desktop/mac/index.html', /<span>v([^<\s]+)<\/span>/g],
   ['fast-folder-sync/desktop/lib/fns-sync.cjs', /clientVersion: '([^']+)'/g],

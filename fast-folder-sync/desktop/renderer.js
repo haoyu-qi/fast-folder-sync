@@ -1,5 +1,6 @@
 const $ = id => document.getElementById(id);
 const api = window.folderSync;
+const agentHome = document.createElement('button'); agentHome.id = 'agent-entry'; agentHome.className = 'nav'; agentHome.textContent = 'Agent 记忆同步'; agentHome.addEventListener('click', () => api.openView('agent').catch(e => toast(e.message))); document.querySelector('aside nav').append(agentHome);
 document.documentElement.classList.toggle('windows', api.platform === 'win32');
 const iconPaths = {
   sync: ['M20 7H5l4-4', 'M4 17h15l-4 4', 'M20 7v5', 'M4 17v-5'],
@@ -25,6 +26,7 @@ function icon(name) {
 }
 document.querySelectorAll('[data-icon]').forEach(el => el.append(icon(el.dataset.icon)));
 let state = { tasks: [], logs: [] }, editing = null, toastTimer;
+const connectionForm = ServiceConfig.bind({ getTasks: () => state.tasks, getEditing: () => editing, updateBackend });
 const phaseNames = { running: '正在同步', waiting: '等待下次同步', success: '同步完成', error: '需要关注', paused: '已暂停' };
 function node(tag, cls, text) { const el = document.createElement(tag); if (cls) el.className = cls; if (text !== undefined) el.textContent = text; return el; }
 function toast(text) { $('toast').textContent = text; $('toast').classList.remove('hidden'); clearTimeout(toastTimer); toastTimer = setTimeout(() => $('toast').classList.add('hidden'), 4500); }
@@ -54,6 +56,24 @@ function render(data) {
   }
   renderLogs();
 }
+function progressCard(progress) {
+  const labels = { starting: '准备同步', probe: '检查服务能力', index: '读取服务端文件索引', 'scan-source': '扫描源文件夹', 'scan-target': '扫描目标文件夹', connect: '连接同步服务', compare: '核对两端文件', copy: '复制并校验文件', upload: '上传文件', download: '下载文件' };
+  const size = value => { let n = value || 0, unit = 0; const units = ['B', 'KB', 'MB', 'GB', 'TB']; while (n >= 1024 && unit < 4) { n /= 1024; unit++; } return n.toFixed(unit ? 1 : 0) + ' ' + units[unit]; };
+  const box = node('div', 'sync-progress');
+  const scanning = progress.stage?.startsWith('scan-');
+  let summary = labels[progress.stage] || '正在同步';
+  if (progress.stage === 'index') summary += ' · 已读取 ' + (progress.checked || 0) + ' 个文件标识';
+  if (scanning) summary += ' · 已检查 ' + (progress.checked || 0) + ' 个文件 · 已校验 ' + size(progress.bytes);
+  if (progress.uploaded !== undefined) summary += ' · 已上传 ' + progress.uploaded + ' · 已下载 ' + progress.downloaded;
+  box.append(node('div', '', summary));
+  if (progress.path) { const current = node('div', 'sync-current', progress.path); current.title = progress.path; box.append(current); }
+  if (progress.fileSize > 0) {
+    const meter = node('progress', 'sync-meter'); meter.max = progress.fileSize; meter.value = progress.fileBytes || 0;
+    meter.setAttribute('aria-label', scanning ? '当前文件校验进度' : '当前文件传输进度');
+    box.append(meter, node('small', '', size(progress.fileBytes) + ' / ' + size(progress.fileSize) + '（当前文件）'));
+  }
+  return box;
+}
 function taskCard(task) {
   const card = node('article', 'task-card');
   const top = node('div', 'task-top'), title = node('div', 'task-title');
@@ -73,7 +93,7 @@ function taskCard(task) {
   const actions = node('div', 'task-actions');
   const run = action('立即同步', () => api.runTask(task.id), 'primary'); run.disabled = task.status.phase === 'running';
   actions.append(run, action(task.enabled ? '暂停自动' : '启用自动', () => api.toggleTask(task.id)), action('设置', () => editTask(task)), action('历史', async () => { switchPage('history'); $('history-task').value = task.id; await renderHistory(); }));
-  bottom.append(details, actions); card.append(top, paths, bottom);
+  bottom.append(details, actions); card.append(top, paths); if (task.status.phase === 'running' && task.status.progress) card.append(progressCard(task.status.progress)); card.append(bottom);
   if (task.status.error) card.append(node('p', 'task-error', task.status.error));
   return card;
 }
@@ -102,6 +122,7 @@ function updateBackend() {
   $('local-fields').classList.toggle('hidden', remote); $('remote-fields').classList.toggle('hidden', !remote);
   $('target').required = !remote; $('server').required = remote; $('vault').required = remote; $('token').required = remote && !editing?.hasToken;
   if (remote) $('mode').value = 'sync'; $('mode').disabled = remote || Boolean(editing);
+  connectionForm.update();
 }
 function editTask(task = null) {
   editing = task; $('task-form').reset(); $('form-error').textContent = '';
@@ -110,7 +131,7 @@ function editTask(task = null) {
   $('token').value = ''; $('token').placeholder = task?.hasToken ? '留空保留已保存的令牌' : '仅在此电脑加密保存';
   $('excludes').value = (task?.excludes || []).join('\n'); $('enabled').checked = task?.enabled ?? true; $('propagate-deletes').checked = task?.propagateDeletes ?? false;
   for (const id of ['pick-source', 'pick-target', 'backend', 'server', 'vault', 'propagate-deletes']) $(id).disabled = Boolean(task);
-  $('edit-hint').classList.toggle('hidden', !task); updateBackend();
+  $('edit-hint').classList.toggle('hidden', !task); connectionForm.reset(task); updateBackend();
   // Removal only changes the task configuration; histories remain on disk.
   document.querySelector('#delete-button')?.remove();
   if (task) { const button = action('移除任务', async () => { if (!confirm('移除此任务？文件和已有历史备份会保留。')) return; await api.deleteTask(task.id); $('task-dialog').close(); }); button.id = 'delete-button'; document.querySelector('.dialog-actions').prepend(button); }
@@ -119,8 +140,8 @@ function editTask(task = null) {
 $('task-form').addEventListener('submit', async event => {
   event.preventDefault(); $('save-button').disabled = true; $('form-error').textContent = '';
   try {
-    await api.saveTask({ id: editing?.id, name: $('task-name').value, source: $('source').value, target: $('target').value, backend: $('backend').value, mode: $('mode').value, server: $('server').value, vault: $('vault').value, token: $('token').value, interval: Number($('interval').value), enabled: $('enabled').checked, propagateDeletes: $('propagate-deletes').checked, excludes: $('excludes').value.split('\n') });
-    $('task-dialog').close(); toast('任务已保存，可点击“立即同步”开始');
+    await api.saveTask({ id: editing?.id, name: $('task-name').value, source: $('source').value, target: $('target').value, backend: $('backend').value, mode: $('mode').value, server: $('server').value, vault: $('vault').value, token: $('token').value, connectionTaskId: connectionForm.connectionTaskId(), interval: Number($('interval').value), enabled: $('enabled').checked, propagateDeletes: $('propagate-deletes').checked, excludes: $('excludes').value.split('\n') });
+    $('token').value = ''; $('connection-config').value = ''; $('task-dialog').close(); toast('任务已保存，可点击“立即同步”开始');
   } catch (e) { $('form-error').textContent = e.message; } finally { $('save-button').disabled = false; }
 });
 for (const id of ['source', 'target']) $('pick-' + id).addEventListener('click', async () => { try { const folder = await api.chooseFolder(); if (folder) $(id).value = folder; } catch (e) { toast(e.message); } });

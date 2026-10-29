@@ -1,6 +1,6 @@
 # Folder Sync 服务端
 
-产品版本 **0.2.2**。为桌面客户端提供私有文件同步、网页文件管理和计划备份，网页端与客户端采用统一的蓝紫毛玻璃界面。
+产品版本 **0.3.0**。为桌面客户端提供私有文件同步、网页文件管理和计划备份，网页端与客户端采用统一的蓝紫毛玻璃界面。
 
 ## 产品说明
 
@@ -24,7 +24,7 @@
 
 ### Docker 部署包与 Compose
 
-部署包附带 Compose、环境变量示例、Dockerfile 和干净源码，解压后无需安装 Go 或 Node.js。需要 Docker Compose v2，默认拉取预构建 linux/amd64 镜像，无需编译。镜像地址为 `ghcr.io/haoyu-qi/fast-folder-sync-service:0.2.2`。发布页另提供可 `docker load` 导入的镜像压缩包与校验文件，步骤见下方 Docker 部署说明。部署 ZIP 不含预设账户或运行数据。
+部署包附带 Compose、环境变量示例、Dockerfile 和干净源码，解压后无需安装 Go 或 Node.js。需要 Docker Compose v2，默认拉取预构建 linux/amd64 镜像，无需编译。镜像地址为 `ghcr.io/haoyu-qi/fast-folder-sync-service:0.3.0`。发布页另提供可 `docker load` 导入的镜像压缩包与校验文件，步骤见下方 Docker 部署说明。部署 ZIP 不含预设账户或运行数据。
 
 在解压目录执行：
 
@@ -41,7 +41,7 @@ Windows PowerShell 使用 `Copy-Item .env.example .env`。源码仓库也可进�
 
 ### Windows / Linux 安装包
 
-从 [0.2.2 发布页](https://github.com/haoyu-qi/fast-folder-sync/releases/tag/v0.2.2)下载对应服务端 ZIP，解压到固定目录。
+从 [0.3.0 发布页](https://github.com/haoyu-qi/fast-folder-sync/releases/tag/v0.3.0)下载对应服务端 ZIP，解压到固定目录。
 
 Windows 运行 `start.cmd`，或在 PowerShell 执行：
 
@@ -75,4 +75,4 @@ chmod +x fast-folder-sync-service start.sh
 
 升级前停止服务并备份配置、数据库和文件存储。原生部署只替换程序及启动脚本，保留 `config/` 与 `storage/`；Docker 更新源码后重建，保留原命名卷，不使用 `down -v`。
 
-完整产品与部署流程见[仓库 README](../README.md)，源码构建和接口说明见[服务端开发说明](../docs/SERVER-DEVELOPMENT.md)，本版本验证见[0.2.2 验证记录](../docs/VALIDATION-0.2.2.md)。服务内核保留上游 3.6.1，与产品版本分别管理。
+完整产品与部署流程见[仓库 README](../README.md)，源码构建和接口说明见[服务端开发说明](../docs/SERVER-DEVELOPMENT.md)，本版本说明见[0.3.0 发布说明](../docs/RELEASE-0.3.0.md)。服务内核保留上游 3.6.1，与产品版本分别管理。
