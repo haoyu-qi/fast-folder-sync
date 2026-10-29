@@ -160,8 +160,7 @@ chmod +x fast-folder-sync-service start.sh
 
 在「存储位置」添加并验证备份目标，再到「备份任务」选择文件库、备份类型、计划和保留周期。镜像同步会使目标跟随源内容；需要保留备份归档时使用全量或增量归档。
 
-升级前停止服务并备份配置、数据库及文件存储。Docker 部署包在原目录替换源码及部署文件、保留原数据和 `.env`，再执行 `docker compose pull
-docker compose up -d --wait --wait-timeout 180`；原命名卷部署继续使用原 Compose 文件、保留原卷，不使用 `down -v`。原生部署替换程序和启动脚本，保留原 `config/` 与 `storage/`。客户端升级为替换可执行文件或应用，保留应用数据目录中的任务和历史版本。
+升级前停止服务并备份配置、数据库及文件存储。Docker 部署包在原目录替换源码及部署文件、保留原数据和 `.env`，再执行 `docker compose pull`，再执行 `docker compose up -d --wait --wait-timeout 180`；原命名卷部署继续使用原 Compose 文件、保留原卷，不使用 `down -v`。原生部署替换程序和启动脚本，保留原 `config/` 与 `storage/`。客户端升级为替换可执行文件或应用，保留应用数据目录中的任务和历史版本。
 
 版本记录见 [CHANGELOG](CHANGELOG.md)。开发与构建见[桌面开发说明](fast-folder-sync/docs/desktop.md)、[服务端开发说明](docs/SERVER-DEVELOPMENT.md)和[版本管理说明](docs/VERSIONING.md)。
 
