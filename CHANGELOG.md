@@ -4,6 +4,14 @@
 
 ## 尚未发布
 
+## [0.3.0] - 2026-10-29
+
+- 新增 Agent 记忆同步工作台，支持 Codex、Claude Code、ZCode 和 WorkBuddy 的本地记忆与规则采集、项目关联、跨电脑同步、可选模型整理和版本恢复。
+- WorkBuddy 支持个人及用户目录中的本地 MEMORY.md、个人 Markdown/MDC 规则、已关联项目的本地记忆及规则，并生成可撤销的 CODEBUDDY.md 读取入口。云端记忆缓存、聊天记录和登录配置不采集。
+- 新增完整服务配置复制与粘贴导入、已保存服务连接复用，以及可选的全部文件库设备授权，简化新增同步文件夹的配置。
+- 同步时显示扫描、内容校验及文件传输进度；修复 Electron 对 .asar 文件的路径拦截，并处理既有远端路径标识与哈希冲突。
+- 同步发布 Windows 客户端、Mac 两种架构客户端、Windows/Linux 服务端、Docker 部署包及镜像，附 SHA-256 校验清单。
+
 ## [0.2.2] - 2026-10-28
 
 - 网页管理台与桌面端统一为蓝紫毛玻璃风格，覆盖登录、概览、文件、备份、设备、回收站、存储、设置和弹窗。
@@ -34,3 +42,4 @@
 [0.2.0]: https://github.com/haoyu-qi/fast-folder-sync/tree/v0.2.0
 [0.2.1]: https://github.com/haoyu-qi/fast-folder-sync/releases/tag/v0.2.1
 [0.2.2]: https://github.com/haoyu-qi/fast-folder-sync/releases/tag/v0.2.2
+[0.3.0]: https://github.com/haoyu-qi/fast-folder-sync/releases/tag/v0.3.0

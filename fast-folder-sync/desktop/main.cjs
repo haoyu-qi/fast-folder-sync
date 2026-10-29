@@ -3,12 +3,14 @@ const { randomUUID } = require('node:crypto');
 const { fs, path, readJson, atomicJson, safePath, statOrNull, digest, replaceFromFile, overlaps, validateRoots } = require('./lib/files.cjs');
 const { syncLocal } = require('./lib/local-sync.cjs');
 const { syncFns, serverUrl } = require('./lib/fns-sync.cjs');
+const { connectionToken } = require('./lib/service-connection.cjs');
+const { AgentService } = require('./lib/agent-service.cjs');
 
 const smoke = process.argv.includes('--smoke-test');
 const macPlatform = process.platform === 'darwin' ? require('./mac/platform.cjs') : null;
 const macUI = Boolean(macPlatform) || process.argv.includes('--mac-preview');
 if (process.env.FFS_TEST_DATA && smoke) app.setPath('userData', path.resolve(process.env.FFS_TEST_DATA));
-let win, tray, dataDir, tasks = [], logs = [], scheduler, quitting = false, writing = false;
+let win, tray, dataDir, agentService, tasks = [], logs = [], scheduler, quitting = false, writing = false;
 const runs = new Map(), statuses = new Map();
 const suspended = new Set();
 function cleanTask(t) { const { token, ...rest } = t; return { ...rest, hasToken: Boolean(token) }; }
@@ -39,12 +41,18 @@ async function run(id) {
   if (runs.has(id) || suspended.has(id)) return;
   const task = tasks.find(t => t.id === id); if (!task) throw Error('任务不存在');
   const controller = new AbortController();
-  const status = { ...statuses.get(id), phase: 'running', startedAt: new Date().toISOString() };
+  const status = { ...statuses.get(id), phase: 'running', error: undefined, progress: { stage: 'starting' }, startedAt: new Date().toISOString() };
   statuses.set(id, status);
+  let lastProgress = 0;
+  const onProgress = progress => {
+    const now = Date.now(), changedStage = status.progress?.stage !== progress.stage;
+    status.progress = progress;
+    if (changedStage || now - lastProgress >= 500) { lastProgress = now; publish(); }
+  };
   const promise = (async () => {
     try {
       log(id, 'info', '开始' + (task.mode === 'backup' ? '备份' : '同步'));
-      const result = await (task.backend === 'local' ? syncLocal : syncFns)(task, dataDir, (level, text) => log(id, level, text), controller.signal);
+      const result = await (task.backend === 'local' ? syncLocal : syncFns)(task, dataDir, (level, text) => log(id, level, text), controller.signal, onProgress);
       statuses.set(id, { phase: 'success', lastRun: new Date().toISOString(), result, nextRun: Date.now() + task.interval * 1000 });
       log(id, result.conflicts ? 'warning' : 'success', `完成：上传 ${result.uploaded} · 下载 ${result.downloaded} · 删除 ${result.deleted} · 冲突 ${result.conflicts}`);
     } catch (e) {
@@ -70,7 +78,7 @@ async function saveTask(value) {
     target: value.backend === 'local' ? path.resolve(String(value.target || '')) : '',
     server: value.backend === 'fns' ? String(value.server || '').trim().replace(/\/$/, '') : '',
     vault: value.backend === 'fns' ? String(value.vault || '').trim() : '',
-    token: value.backend === 'fns' ? (String(value.token || '').trim() || old?.token || '') : '',
+    token: value.backend === 'fns' ? connectionToken(value, tasks, old) : '',
     mode: value.mode, interval: Number(value.interval), enabled: value.enabled !== false,
     propagateDeletes: value.propagateDeletes === true,
     excludes: Array.isArray(value.excludes) ? value.excludes.map(v => String(v).trim()).filter(Boolean).slice(0, 100) : []
@@ -136,6 +144,11 @@ function ipc(name, handler) {
   });
 }
 function registerIpc() {
+  ipc('agent-command', (command, args) => agentService.dispatch(command, args));
+  ipc('open-view', async view => {
+    if (!['agent', 'files'].includes(view)) throw Error('无效的页面');
+    await win.loadFile(path.join(__dirname, view === 'agent' ? 'agent.html' : macUI ? 'mac/index.html' : 'index.html'));
+  });
   ipc('get-state', snapshot);
   ipc('choose-folder', async () => { const answer = await dialog.showOpenDialog(win, { properties: ['openDirectory', 'createDirectory'] }); return answer.canceled ? null : answer.filePaths[0]; });
   ipc('save-task', async value => { if (value?.id) suspended.add(value.id); try { return await saveTask(value); } finally { if (value?.id) suspended.delete(value.id); } });
@@ -248,6 +261,8 @@ async function createWindow() {
         return { width: innerWidth, height: innerHeight, horizontalOverflow: false };
       })()`);
     }
+    report.connection = await require('./lib/service-smoke.cjs').verify(win, dataDir);
+    report.agent = await require('./lib/agent-smoke.cjs').verify(win, agentService, dataDir);
     const state = await win.webContents.executeJavaScript('({title:document.title,cards:document.querySelectorAll(".task-card").length,bridge:typeof window.folderSync.getState})');
     await atomicJson(path.join(dataDir, 'smoke.json'), { ...state, ...report }); quitting = true; app.quit();
   }
@@ -264,20 +279,32 @@ else {
       const { encryptedToken, ...rest } = t;
       return { ...rest, token: encryptedToken ? safeStorage.decryptString(Buffer.from(encryptedToken, 'base64')) : '' };
     });
+    agentService = await new AgentService(dataDir, {
+      ...(smoke ? { home: path.join(dataDir, 'agent-test-home') } : {}),
+      seal: value => { if (!safeStorage.isEncryptionAvailable()) throw Error('操作系统凭据加密不可用'); return safeStorage.encryptString(value).toString('base64'); },
+      unseal: value => safeStorage.decryptString(Buffer.from(value, 'base64'))
+    }).init();
     registerIpc(); await createWindow();
     if (!smoke) {
       tray = new Tray(macPlatform ? macPlatform.trayIcon() : nativeImage.createFromPath(path.join(__dirname, 'icon.png')).resize({ width: 20, height: 20 }));
       tray.setToolTip('Fast Folder Sync');
       tray.setContextMenu(Menu.buildFromTemplate([{ label: '打开 Fast Folder Sync', click: () => win.show() }, { label: '退出', click: () => { quitting = true; app.quit(); } }])); tray.on('double-click', () => win.show());
       if (macPlatform) tray.on('click', () => { win.show(); win.focus(); });
-      scheduler = setInterval(() => { for (const t of tasks) if (t.enabled && !runs.has(t.id) && (statuses.get(t.id)?.nextRun || 0) <= Date.now()) void run(t.id); }, 1000);
+      let nextAgentRun = Date.now() + 30000;
+      scheduler = setInterval(() => {
+        for (const t of tasks) if (t.enabled && !runs.has(t.id) && (statuses.get(t.id)?.nextRun || 0) <= Date.now()) void run(t.id);
+        if (agentService.config.auto && !agentService.busy && Date.now() >= nextAgentRun) {
+          nextAgentRun = Date.now() + 30000;
+          void agentService.dispatch('cycle').catch(() => log(null, 'error', 'Agent Sync 自动处理失败，请在记忆工作台检查来源与连接'));
+        }
+      }, 1000);
     }
   }).catch(async e => { if (smoke) { await atomicJson(path.join(dataDir, 'smoke-error.json'), { error: e.message, stack: e.stack }); app.exit(1); } else { dialog.showErrorBox('Fast Folder Sync 启动失败', e.message); quitting = true; app.quit(); } });
   app.on('before-quit', event => {
     clearInterval(scheduler);
-    if (runs.size) {
+    if (runs.size || agentService?.busy) {
       event.preventDefault(); quitting = true;
-      Promise.all([...runs.keys()].map(stop)).then(() => app.quit());
+      Promise.all([...runs.keys()].map(stop).concat(agentService ? [agentService.close()] : [])).then(() => app.quit());
     }
   });
   app.on('activate', () => { win?.show(); });

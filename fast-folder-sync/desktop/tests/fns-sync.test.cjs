@@ -6,24 +6,32 @@ const { WebSocketServer } = require('ws');
 const { fs, path, rolling, readJson } = require('../lib/files.cjs');
 const { syncFns, serverUrl } = require('../lib/fns-sync.cjs');
 
-async function setup(t, handler) {
+async function setup(t, handler, options = {}) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'ffs-protocol-'));
   const source = path.join(root, 'source'), data = path.join(root, 'data'); await fs.mkdir(source);
   const server = new WebSocketServer({ host: '127.0.0.1', port: 0 });
   await new Promise(resolve => server.once('listening', resolve));
   t.after(async () => { for (const c of server.clients) c.terminate(); await new Promise(resolve => server.close(resolve)); await fs.rm(root, { recursive: true, force: true }); });
+  let connections = 0;
   server.on('connection', socket => {
+    const discovery = options.discovery !== undefined && connections++ % 2 === 0;
     const send = (action, data, extra = {}) => socket.send(action + '|' + JSON.stringify({ code: 200, data, ...extra }));
     socket.on('message', (buffer, binary) => {
       if (binary) return handler({ socket, buffer, binary, send });
       const text = buffer.toString(), at = text.indexOf('|'), action = text.slice(0, at), body = text.slice(at + 1);
       if (action === 'Authorization') { assert.equal(body, 'test-token'); send('Authorization', { version: 'test' }); return; }
       if (action === 'ClientInfo') { assert.equal(JSON.parse(body).protobuf, false); return; }
+      if (discovery && action === 'FileSync') {
+        const data = JSON.parse(body); assert.deepEqual(data.files, []); assert.equal(data.lastTime, 0);
+        const files = typeof options.discovery === 'function' ? options.discovery() : options.discovery;
+        send('FileSyncEnd', { lastTime: 1, needModifyCount: files.length, messages: files.map(file => ({ action: 'FileSyncUpdate', data: file })) });
+        return;
+      }
       handler({ socket, action, body: JSON.parse(body), send });
     });
   });
   const task = { id: randomUUID(), backend: 'fns', mode: 'sync', source, server: `http://127.0.0.1:${server.address().port}`, token: 'test-token', vault: 'GeneralFiles', excludes: [], propagateDeletes: false };
-  return { source, data, task, run: signal => syncFns(task, data, undefined, signal) };
+  return { source, data, task, run: (signal, onProgress) => syncFns(task, data, undefined, signal, onProgress) };
 }
 test('uses the JSON wire format and streams binary uploads including empty files', { timeout: 10000 }, async t => {
   const uploaded = new Map(), noteBodies = [], sessions = new Map();
@@ -49,7 +57,12 @@ test('uses the JSON wire format and streams binary uploads including empty files
   const bytes = Buffer.from([0, 255, 128, 1, 2, 0, 255]);
   await fs.writeFile(path.join(f.source, '数据.bin'), bytes); await fs.writeFile(path.join(f.source, 'empty'), ''); await fs.writeFile(path.join(f.source, 'a.md'), '中文 note');
   const encodedMarkdown = Buffer.from([255, 254, 65, 0, 66, 0]); await fs.writeFile(path.join(f.source, 'utf16.md'), encodedMarkdown);
-  const result = await f.run(); assert.equal(result.uploaded, 4);
+  const progress = [];
+  const result = await f.run(undefined, event => progress.push(event)); assert.equal(result.uploaded, 4);
+  for (const stage of ['probe', 'scan-source', 'connect', 'compare', 'upload']) assert.ok(progress.some(event => event.stage === stage), stage);
+  const transferred = progress.filter(event => event.stage === 'upload' && event.path === '数据.bin');
+  assert.equal(transferred[0].fileBytes, 0);
+  assert.equal(transferred.at(-1).fileBytes, bytes.length);
   assert.deepEqual(uploaded.get('数据.bin'), bytes); assert.equal(uploaded.get('empty').length, 0);
   assert.deepEqual(uploaded.get('utf16.md'), encodedMarkdown);
   assert.equal(noteBodies[0].contentHash, rolling('中文 note'));
@@ -68,7 +81,9 @@ test('downloads out-of-order binary chunks, verifies content, and retains concur
     }
   });
   await fs.writeFile(path.join(f.source, 'image.bin'), 'local edit');
-  const result = await f.run(); assert.equal(result.downloaded, 1); assert.equal(result.conflicts, 1);
+  const progress = [];
+  const result = await f.run(undefined, event => progress.push(event)); assert.equal(result.downloaded, 1); assert.equal(result.conflicts, 1);
+  assert.equal(progress.filter(event => event.stage === 'download').at(-1).fileBytes, bytes.length);
   assert.deepEqual(await fs.readFile(path.join(f.source, 'image.bin')), bytes);
   const conflict = (await fs.readdir(f.source)).find(n => n.includes('.conflict-local-'));
   assert.equal(await fs.readFile(path.join(f.source, conflict), 'utf8'), 'local edit');
@@ -130,7 +145,7 @@ test('remembered generic-server capability keeps Markdown binary when the discov
       send('FileSyncEnd', { lastTime: 3, needUploadCount: 1 });
     }
     if (binary) { assert.deepEqual(buffer.subarray(42), payload); send('FileUploadAck', { path: 'readme.md' }); }
-  });
+  }, { discovery: [] });
   await fs.mkdir(path.join(f.data, 'state'), { recursive: true });
   await fs.writeFile(path.join(f.data, 'state', f.task.id + '.json'), JSON.stringify({ entries: {}, times: {}, dirs: [], generic: true }));
   await fs.writeFile(path.join(f.source, 'readme.md'), payload);

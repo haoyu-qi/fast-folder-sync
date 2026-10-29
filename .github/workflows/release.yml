@@ -154,5 +154,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           VERSION=$(cat VERSION)
-          gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --draft --title "Fast Folder Sync $VERSION · 统一毛玻璃界面" --notes-file "docs/RELEASE-$VERSION.md"
+          gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --draft --title "Fast Folder Sync $VERSION · Agent 记忆同步与连接复用" --notes-file "docs/RELEASE-$VERSION.md"
           gh release edit "$GITHUB_REF_NAME" --draft=false --latest

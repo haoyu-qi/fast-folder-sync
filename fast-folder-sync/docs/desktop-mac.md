@@ -1,10 +1,10 @@
 # Fast Folder Sync · Mac 客户端
 
-产品版本 **0.2.2**。Mac 专属界面位于 `desktop/mac/`，在 macOS 自动加载，与其他平台共用同步引擎、任务配置和历史恢复。
+产品版本 **0.3.0**。Mac 专属界面位于 `desktop/mac/`，在 macOS 自动加载，与其他平台共用同步引擎、任务配置和历史恢复。
 
 ## 安装
 
-从 [0.2.2 发布页](https://github.com/haoyu-qi/fast-folder-sync/releases/tag/v0.2.2)下载：Apple Silicon（M 系列）选择 arm64，Intel Mac 选择 x64。需要 macOS 13 或更新版本。
+从 [0.3.0 发布页](https://github.com/haoyu-qi/fast-folder-sync/releases/tag/v0.3.0)下载：Apple Silicon（M 系列）选择 arm64，Intel Mac 选择 x64。需要 macOS 13 或更新版本。
 
 打开 DMG 或解压 ZIP，将 `Fast Folder Sync.app` 拖入「应用程序」。首次启动为空白工作空间，自行选择源文件夹和目标位置。安装包不含账户、令牌或示例任务。
 
@@ -44,11 +44,11 @@ npx electron-builder --config electron-builder.mac.cjs --mac dmg zip --arm64 --p
 
 Intel 将 `--arm64` 换为 `--x64`。ad-hoc 签名不等于 Developer ID 签名或公证，正式签名分发需要自己的证书和公证配置。
 
-产品标签通过 `.github/workflows/release.yml` 构建并发布配套版本；另有手动 `.github/workflows/macos-client.yml` 可单独构建测试产物。0.2.1 的 Mac 预览标签 `v0.2.1-macos` 保留原样，0.2.2 使用统一产品标签。
+产品标签通过 `.github/workflows/release.yml` 构建并发布配套版本；另有手动 `.github/workflows/macos-client.yml` 可单独构建测试产物。0.2.1 的 Mac 预览标签 `v0.2.1-macos` 保留原样，0.3.0 使用统一产品标签。
 
 ## 验证与资源
 
-本版本验证记录见 [0.2.2 验证](../../docs/VALIDATION-0.2.2.md)。仓库 README 的 Mac 配图来自 Windows 上运行的实际 Mac renderer，用于展示布局，不能代表 Mac 原生材质。
+本版本发布与验证范围见 [0.3.0 说明](../../docs/RELEASE-0.3.0.md)。仓库 README 的 Mac 配图来自 Windows 上运行的实际 Mac renderer，用于展示布局，不能代表 Mac 原生材质。
 
 Windows 可执行 `npm run start:mac-preview` 预览布局。隔离验证需传入 `--mac-preview --smoke-test`，并用 `FFS_TEST_DATA`、`FFS_SMOKE_SOURCE`、`FFS_SMOKE_TARGET` 指定测试目录。
 

@@ -1,8 +1,10 @@
 # Fast Folder Sync
 
+**新增功能：Agent 记忆同步（Agent Sync）**——在原有文件同步与备份基础上，新增跨电脑、跨 Codex / Claude Code / ZCode / WorkBuddy 的个人记忆工作台。支持选择已有记忆与规则、项目关联、摘要整理和版本恢复。原首页、任务及功能入口保持不变，通过侧栏「Agent 记忆同步」进入新增功能。[Agent Sync 使用说明](docs/AGENT-SYNC.md)
+
 通用文件夹备份与同步软件，包含独立桌面客户端和可私有部署的网页服务端。支持文档、照片、视频、代码及其他二进制文件，无需安装 其他软件。
 
-当前版本：**0.2.2**。客户端与网页管理台统一采用蓝紫毛玻璃界面。
+当前版本：**0.3.0**。客户端与网页管理台统一采用蓝紫毛玻璃界面。
 
 ## 产品说明
 
@@ -56,6 +58,10 @@ Mac 配图为 Windows 环境中的布局预览。Mac 安装包的构建方式和
 
 跨电脑同步：在网页管理台建立文件库 →「连接设备」生成配置 → 在各台电脑新建「Folder Sync 私有服务」任务 → 填入服务根地址、相同文件库名称及设备令牌。
 
+同步会先扫描源目录并校验文件内容，再与服务端核对和传输；首次处理大型文件夹可能需要较长时间。0.3.0 会显示扫描文件数、校验字节数及当前文件传输进度。若源目录包含不需要备份的缓存或构建产物，可在任务设置中添加排除规则，例如 `tmp/**`；请按实际需要设置，避免排除需要同步的文件。
+
+若提示「服务端路径哈希发生冲突」，表示不同路径碰到了旧协议的同一个 32 位标识，不代表文件内容损坏。客户端修复预览版 `0.2.3-asar.3` 会先通过原有设备令牌读取远端文件索引，保留已有文件标识，为碰撞的新文件使用完整 SHA-256 路径标识；兼容 0.3.0 私有服务，无需重建文件库。该修复针对普通文件；旧协议的目录和文本资源发生路径冲突时仍会停止并提示。
+
 恢复文件：桌面覆盖前的文件在「历史版本」恢复，恢复前先关闭该任务的自动同步；服务端软删除文件在「回收站」恢复。
 
 关闭桌面窗口后，任务继续在 Windows 托盘或 Mac 菜单栏运行。完全退出请使用对应菜单中的「退出」。源目录、目标目录以及不同任务的目录不能相同、嵌套或重叠。
@@ -70,13 +76,13 @@ Mac 配图为 Windows 环境中的布局预览。Mac 安装包的构建方式和
 
 ### 1. 安装桌面客户端
 
-从 [0.2.2 配套版本](https://github.com/haoyu-qi/fast-folder-sync/releases/tag/v0.2.2)选择对应附件。校验文件为同一版本的 `SHA256SUMS.txt`。
+从 [0.3.0 配套版本](https://github.com/haoyu-qi/fast-folder-sync/releases/tag/v0.3.0)选择对应附件。校验文件为同一版本的 `SHA256SUMS.txt`。
 
 | 系统 | 附件 | 安装方式 |
 | --- | --- | --- |
-| Windows x64 | `Fast-Folder-Sync-0.2.2-Windows-x64.exe` | 便携版，下载后直接运行 |
-| macOS 13+，Apple Silicon | `Fast-Folder-Sync-0.2.2-macOS-arm64.dmg` 或 `.zip` | 将应用拖入「应用程序」 |
-| macOS 13+，Intel | `Fast-Folder-Sync-0.2.2-macOS-x64.dmg` 或 `.zip` | 将应用拖入「应用程序」 |
+| Windows x64 | `Fast-Folder-Sync-0.3.0-Windows-x64.exe` | 便携版，下载后直接运行 |
+| macOS 13+，Apple Silicon | `Fast-Folder-Sync-0.3.0-macOS-arm64.dmg` 或 `.zip` | 将应用拖入「应用程序」 |
+| macOS 13+，Intel | `Fast-Folder-Sync-0.3.0-macOS-x64.dmg` 或 `.zip` | 将应用拖入「应用程序」 |
 
 Windows 包未进行代码签名。Mac 包使用本地 ad-hoc 签名，没有 Developer ID 签名和 Apple 公证；首次打开请按系统允许打开流程操作。仅进行本地备份时，到此即可使用。
 
@@ -86,7 +92,7 @@ Windows 包未进行代码签名。Mac 包使用本地 ad-hoc 签名，没有 De
 
 **方式 A：Docker 部署包 / Compose**
 
-部署包 `Folder-Sync-Server-0.2.2-Docker.zip` 包含 Compose、环境变量示例、干净源码和源码提交记录，另附 Docker 包专用 SHA-256 清单。默认拉取预构建的 linux/amd64 镜像，宿主机只需 Docker 与 Docker Compose v2，无需编译。镜像地址为 `ghcr.io/haoyu-qi/fast-folder-sync-service:0.2.2`。也可下载[镜像压缩包](https://github.com/haoyu-qi/fast-folder-sync/releases/download/v0.2.2/Folder-Sync-Server-0.2.2-Docker-Image-linux-amd64.tar.gz)，执行 `docker load -i 文件名.tar.gz` 后以 `docker compose up -d --pull never` 启动。
+部署包 `Folder-Sync-Server-0.3.0-Docker.zip` 包含 Compose、环境变量示例、干净源码和源码提交记录，另附 Docker 包专用 SHA-256 清单。默认拉取预构建的 linux/amd64 镜像，宿主机只需 Docker 与 Docker Compose v2，无需编译。镜像地址为 `ghcr.io/haoyu-qi/fast-folder-sync-service:0.3.0`。也可下载[镜像压缩包](https://github.com/haoyu-qi/fast-folder-sync/releases/download/v0.3.0/Folder-Sync-Server-0.3.0-Docker-Image-linux-amd64.tar.gz)，执行 `docker load -i 文件名.tar.gz` 后以 `docker compose up -d --pull never` 启动。
 
 解压后在包目录执行：
 
@@ -128,7 +134,7 @@ docker compose logs --tail=100 -f
 
 **方式 B：Windows / Linux 安装包**
 
-在同一 [0.2.2 发布页](https://github.com/haoyu-qi/fast-folder-sync/releases/tag/v0.2.2)下载 `Folder-Sync-Server-0.2.2-Windows-x64.zip` 或 `Folder-Sync-Server-0.2.2-Linux-x64.zip`，解压到固定目录。安装包已包含网页管理台，无需安装 Node.js 或 Go。
+在同一 [0.3.0 发布页](https://github.com/haoyu-qi/fast-folder-sync/releases/tag/v0.3.0)下载 `Folder-Sync-Server-0.3.0-Windows-x64.zip` 或 `Folder-Sync-Server-0.3.0-Linux-x64.zip`，解压到固定目录。安装包已包含网页管理台，无需安装 Node.js 或 Go。
 
 Windows 运行 `start.cmd`；也可在解压目录用 PowerShell 启动：
 
@@ -149,9 +155,9 @@ chmod +x fast-folder-sync-service start.sh
 
 1. 打开网页管理台，创建首个账户。首个账户建立后默认关闭公开注册，后续使用已有账户登录。
 2. 点击「新建文件库」，例如「工作资料」。
-3. 在「连接设备」选择文件库并生成设备配置。
-4. 桌面端点击「新建任务」，选择本地源文件夹，目标类型选择「Folder Sync 私有服务」。
-5. 填入服务根地址（例如 `http://192.168.1.10:9000`）、相同文件库名称及设备令牌，保存后同步。
+3. 在「连接设备」选择文件库并生成设备配置。经常新增文件库的可信电脑，可将授权范围改为「全部文件库（含今后新建的文件库）」；默认仍只授权所选文件库。
+4. 复制「完整配置」。桌面端点击「新建任务」，选择本地源文件夹，目标类型选择「Folder Sync 私有服务」，展开「粘贴服务配置」并点击「填入配置」。
+5. 保存后同步。以后新增同步文件夹时，可选择已保存的「服务连接」，只填写独立的文件库名和本地目录；服务地址及已加密保存的令牌会复用。最近一个任务为私有服务时，新建任务默认选择该连接。单库令牌无法访问其他库，需要重新签发适当授权的令牌。
 6. 其他电脑重复连接步骤，各自选择本地文件夹，连接同一个文件库。
 
 桌面端填写服务根地址；浏览器访问服务地址后加 `/webgui/`。跨设备连接时，服务端地址必须能被各台电脑访问，并开放对应端口。通过反向代理使用时，需要代理 HTTP 接口及 `/api/user/sync` 的 WebSocket 连接；对外地址可通过 `server.ext-api-url` 配置。

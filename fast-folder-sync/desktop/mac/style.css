@@ -227,3 +227,7 @@ header p, .metrics small, .section-heading h2 > span, .background-hint,
   aside, .metrics > div, .task-card, .empty, .panel, dialog, html[data-platform=darwin] body, html[data-platform=darwin] aside { background: #26334a }
 }
 @media(prefers-reduced-motion:reduce) { * { transition: none !important; animation: none !important } }
+
+.sync-progress { margin: 0 0 16px; padding: 12px 14px; border: 1px solid rgba(100,120,160,.25); border-radius: 10px; font-size: 13px; min-width: 0; }
+.sync-current { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 5px 0; opacity: .75; }
+.sync-meter { width: 100%; height: 8px; accent-color: #576cf5; }

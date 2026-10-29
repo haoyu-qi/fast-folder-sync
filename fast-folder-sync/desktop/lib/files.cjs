@@ -1,5 +1,9 @@
-const fs = require('node:fs/promises');
-const { createReadStream } = require('node:fs');
+// Electron treats *.asar as virtual directories in its patched fs APIs.
+// Synchronization must operate on the physical archive bytes for every file
+// operation, without disabling ASAR loading for the application itself.
+const diskFs = process.versions.electron ? require('original-fs') : require('node:fs');
+const fs = diskFs.promises;
+const { createReadStream } = diskFs;
 const path = require('node:path');
 const { createHash, randomUUID } = require('node:crypto');
 const { isUtf8 } = require('node:buffer');
@@ -39,9 +43,9 @@ async function safePath(root, name) {
 async function statOrNull(file) {
   try { return await fs.lstat(file); } catch (e) { if (e.code === 'ENOENT') return null; throw e; }
 }
-async function digest(file, signal) {
+async function digest(file, signal, onBytes) {
   const hash = createHash('sha256');
-  for await (const block of createReadStream(file, { signal })) hash.update(block);
+  for await (const block of createReadStream(file, { signal })) { hash.update(block); onBytes?.(block.length); }
   return hash.digest('hex');
 }
 function rolling(value) {
@@ -70,6 +74,15 @@ async function wireHash(file, size, kind) {
 }
 async function scan(root, patterns = [], protocol = false, signal, options = {}) {
   const files = Object.create(null), dirs = [];
+  let checked = 0, bytes = 0, lastUpdate = 0;
+  function progress(name, fileBytes = 0, fileSize = 0, force = false) {
+    if (!options.onProgress) return;
+    const now = Date.now();
+    if (!force && now - lastUpdate < 200) return;
+    lastUpdate = now;
+    options.onProgress({ stage: options.stage || 'scan-source', checked, bytes, path: name, fileBytes, fileSize });
+  }
+  progress('', 0, 0, true);
   const s = await fs.lstat(root);
   if (!s.isDirectory() || s.isSymbolicLink()) throw Error('文件夹不存在或为链接: ' + root);
   async function visit(prefix) {
@@ -77,12 +90,14 @@ async function scan(root, patterns = [], protocol = false, signal, options = {})
       signal?.throwIfAborted();
       const name = prefix ? prefix + '/' + entry.name : entry.name;
       if (excluded(name, patterns) || entry.isSymbolicLink()) continue;
+      progress(name);
       relativeName(name);
       if (entry.isDirectory()) { dirs.push(name); await visit(name); }
       else if (entry.isFile()) {
         const full = await safePath(root, name);
         const before = await fs.stat(full);
-        const hash = await digest(full, signal);
+        let fileBytes = 0;
+        const hash = await digest(full, signal, length => { bytes += length; fileBytes += length; progress(name, fileBytes, before.size); });
         // Markdown is a note only when it is valid UTF-8 and fits comfortably
         // inside a text frame. Every other file uses lossless binary transport.
         const noteAllowed = !options.binaryOnly || options.notePaths?.has(name);
@@ -91,10 +106,13 @@ async function scan(root, patterns = [], protocol = false, signal, options = {})
         const after = await fs.stat(full);
         if (before.size !== after.size || before.mtimeMs !== after.mtimeMs) throw Error('文件正在修改，将在下轮重试: ' + name);
         files[name] = { hash, size: after.size, mtime: after.mtimeMs, ctime: after.birthtimeMs, ...(protocol ? { contentHash, kind } : {}) };
+        checked++;
+        progress(name, fileBytes, before.size);
       }
     }
   }
   await visit('');
+  progress('', 0, 0, true);
   return { files, dirs };
 }
 async function atomicJson(file, data) {

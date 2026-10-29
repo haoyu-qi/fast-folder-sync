@@ -134,12 +134,12 @@ function editSpace(space) {
 }
 function connectDevice() {
   if (!state.spaces.length) { toast('先建立一个文件库，再连接设备。'); editSpace(); return; }
-  showModal('连接你的电脑', '签发只用于同步所选文件库的设备令牌。', `<div class="connection-steps"><span>1 选择文件库</span><span>2 生成配置</span><span>3 填入桌面端</span></div><label>同步到文件库<select name="vault" required>${spaceOptions(state.selected)}</select></label>${input('days', '令牌有效天数', 30, 'number', 'min="1" max="3650" required')}<p class="form-help">在桌面端选择私有同步服务，填写下一步生成的服务地址、文件库名和令牌。</p>`, async data => {
+  showModal('连接你的电脑', '选择这台电脑可以同步的文件库。', `<div class="connection-steps"><span>1 选择文件库</span><span>2 生成配置</span><span>3 填入桌面端</span></div><label>同步到文件库<select name="vault" required>${spaceOptions(state.selected)}</select></label><label>授权范围<select name="scope"><option value="selected">仅所选文件库</option><option value="all">全部文件库（含今后新建的文件库）</option></select></label><p class="form-help">选择全部文件库后，桌面端新增文件夹可复用此次连接。仅向可信电脑授予此权限。</p>${input('days', '令牌有效天数', 30, 'number', 'min="1" max="3650" required')}<p class="form-help">在桌面端选择私有同步服务，粘贴下一步生成的完整配置，保存后可复用服务连接。</p>`, async data => {
     const vault = data.get('vault');
-    const result = await request('/token', { method: 'POST', body: { clientType: 'FastFolderSync', protocol: 'ws', client: 'FastFolderSync', function: '*', expiredDays: Number(data.get('days')), vaults: vault } });
+    const result = await request('/token', { method: 'POST', body: { clientType: 'FastFolderSync', protocol: 'ws', client: 'FastFolderSync', function: '*', expiredDays: Number(data.get('days')), vaults: data.get('scope') === 'all' ? '' : vault } });
     const server = new URL(url('/version')).origin + new URL(url('/version')).pathname.replace(/\/api\/version$/, '');
     modalBusy = false; closeModal();
-    showModal('设备配置已准备好。', '令牌只在这里显示一次，请粘贴到桌面端保存。', `<div class="config-field"><span>服务地址</span><code>${escape(server)}</code></div><div class="config-field"><span>文件库名称</span><code>${escape(vault)}</code></div><label>设备令牌<textarea id="issued-token" rows="4" readonly>${escape(result.token)}</textarea></label><button type="button" data-action="copy-token" class="full-width">${icon('copy')} 复制令牌</button><p class="form-help">可在「连接设备」中随时撤销此令牌。</p>`, null);
+    showModal('设备配置已准备好。', '在桌面端新建私有服务任务，展开“粘贴服务配置”后填入。', `<div class="config-field"><span>服务地址</span><code>${escape(server)}</code></div><div class="config-field"><span>文件库名称</span><code>${escape(vault)}</code></div><label>设备令牌<textarea id="issued-token" rows="4" readonly>${escape(result.token)}</textarea></label><button type="button" data-action="copy-token" class="full-width">${icon('copy')} 复制令牌</button><label>完整配置<textarea id="issued-config" rows="4" readonly>${escape(JSON.stringify({ server, vault, token: result.token }, null, 2))}</textarea></label><button type="button" data-action="copy-config" class="full-width">${icon('copy')} 复制完整配置</button><p class="form-help">授权范围：${data.get('scope') === 'all' ? '全部文件库（含今后新建）' : escape(vault)}。配置含设备令牌，请妥善保存；可在「连接设备」中随时撤销。</p>`, null);
     await refresh();
   }, '生成设备配置');
 }
@@ -207,6 +207,7 @@ const actions = {
   'page-prev': () => { state.page--; return loadEntries(); }, 'page-next': () => { state.page++; return loadEntries(); },
   connect: connectDevice, refresh,
   'token-revoke': el => { const token = state.tokens[Number(el.dataset.index)]; confirmAction('撤销此访问令牌？', '使用此令牌的设备将断开连接。你可以随时签发新令牌。', () => request('/token/' + token.id, { method: 'DELETE' }), '撤销令牌'); },
+  'copy-config': async () => { const field = $('#issued-config'); try { await navigator.clipboard.writeText(field.value); toast('完整配置已复制'); } catch { field.select(); toast('请复制已选中的完整配置'); } },
   'copy-token': async () => { const field = $('#issued-token'); try { await navigator.clipboard.writeText(field.value); toast('令牌已复制'); } catch { field.select(); toast('请复制已选中的令牌'); } },
   'close-modal': () => { if (!modalBusy) closeModal(); },
   account: () => go('settings'),

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
-  <title>Fast Folder Sync</title><link rel="stylesheet" href="style.css"><script src="renderer.js" defer></script>
+  <title>Fast Folder Sync</title><link rel="stylesheet" href="style.css"><script src="service-config.js" defer></script><script src="renderer.js" defer></script>
 </head>
 <body>
   <div class="titlebar"><span data-icon="sync"></span><span>Fast Folder Sync</span><span class="titlebar-divider"></span><span class="titlebar-caption">你的文件，安心同步</span></div>
@@ -12,7 +12,7 @@
     <div class="workspace-label">工作空间</div>
     <nav aria-label="主导航"><button class="nav active" data-page="tasks" aria-current="page"><span data-icon="folders"></span><span>文件夹任务</span><b id="nav-count">0</b></button><button class="nav" data-page="activity"><span data-icon="activity"></span><span>同步记录</span></button><button class="nav" data-page="history"><span data-icon="history"></span><span>历史版本</span></button></nav>
     <div class="side-note"><span class="side-shield" data-icon="shield"></span><strong>文件在你掌控之中</strong><p>本地优先，私密同步。<br>每一次变化，都多一份保障。</p><span class="local-label"><span class="live-dot"></span> LOCAL FIRST</span></div>
-    <button class="data-button" id="open-data"><span data-icon="settings"></span> 应用数据目录<span data-icon="external"></span></button><div class="version">Fast Folder Sync · v0.2.2</div>
+    <button class="data-button" id="open-data"><span data-icon="settings"></span> 应用数据目录<span data-icon="external"></span></button><div class="version">Fast Folder Sync · v0.3.0</div>
   </aside>
   <main>
     <header><div><div class="eyebrow">YOUR FILES, EVERYWHERE</div><h1 id="page-title">文件夹任务</h1><p id="page-description">让重要文件，始终多一份安心。</p></div><button class="primary" id="add-task"><span data-icon="plus"></span>新建任务</button></header>
@@ -27,7 +27,7 @@
     <label>源文件夹<div class="path-input"><input id="source" required placeholder="选择需要保护的文件夹" readonly><button type="button" id="pick-source">选择文件夹</button></div></label>
     <div class="two-columns"><label>目标类型<select id="backend"><option value="local">本地 / 移动磁盘 / 已挂载网络目录</option><option value="fns">Folder Sync 私有服务</option></select></label><label>任务模式<select id="mode"><option value="backup">单向备份：源 → 目标</option><option value="sync">双向同步：源 ⇄ 目标</option></select></label></div>
     <div id="local-fields"><label>目标文件夹<div class="path-input"><input id="target" placeholder="选择备份或同步目标" readonly><button type="button" id="pick-target">选择文件夹</button></div></label></div>
-    <div id="remote-fields" class="hidden"><label>服务地址<input id="server" type="url" placeholder="https://sync.example.com"></label><div class="two-columns"><label>文件库名称<input id="vault" placeholder="与服务端配置一致"></label><label>访问令牌<input id="token" type="password" autocomplete="off" placeholder="仅在此电脑加密保存"></label></div><p class="footnote">填写服务地址、文件库名和设备令牌。新版服务自动启用完整 SHA-256 校验与通用二进制传输。</p></div>
+    <div id="remote-fields" class="hidden"><div id="connection-tools"><label>服务连接<select id="saved-connection"><option value="">新连接 / 手动填写</option></select></label><details id="config-details"><summary>粘贴服务配置</summary><label>完整配置<textarea id="connection-config" rows="3" autocomplete="off" spellcheck="false" placeholder="粘贴网页端复制的完整 JSON 配置"></textarea></label><button id="import-config" type="button">填入配置</button></details><p class="footnote">保存一次后可复用连接。新增任务请填写独立文件库名；令牌需有该库的访问权限。经常新增文件库时，可在网页端签发“全部文件库”令牌。</p></div><label>服务地址<input id="server" type="url" placeholder="https://sync.example.com"></label><div class="two-columns"><label>文件库名称<input id="vault" placeholder="与服务端配置一致"></label><label>访问令牌<input id="token" type="password" autocomplete="off" placeholder="仅在此电脑加密保存"></label></div><p class="footnote">填写服务地址、文件库名和设备令牌。新版服务自动启用完整 SHA-256 校验与通用二进制传输。</p></div>
     <div class="two-columns"><label>自动核对间隔（秒）<input id="interval" type="number" min="10" max="86400" value="30" required></label><label>排除规则（每行一条）<textarea id="excludes" rows="3" placeholder="*.tmp&#10;cache/**"></textarea></label></div>
     <p class="footnote">默认排除 .git、node_modules、系统缓存和临时传输文件；跳过符号链接。</p>
     <label class="checkbox"><input id="enabled" type="checkbox" checked><span>保存后自动定期同步</span></label>

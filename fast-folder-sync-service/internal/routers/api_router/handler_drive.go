@@ -33,7 +33,7 @@ func NewDriveHandler(a *app.App, wss *pkgapp.WebsocketServer) *DriveHandler {
 
 func DriveCapabilities(c *gin.Context) {
 	pkgapp.NewResponse(c).ToResponse(code.Success.WithData(gin.H{
-		"product": "Fast Folder Sync", "version": "0.2.2", "binaryOnly": true,
+		"product": "Fast Folder Sync", "version": "0.3.0", "binaryOnly": true,
 		"fileContentHash": "sha256", "pathHash": "rolling32", "webSocketPath": "/api/user/sync",
 		"features": []string{"generic-files", "streaming-upload", "file-libraries", "recycle-bin", "scheduled-backup"},
 	}))

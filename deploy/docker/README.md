@@ -15,16 +15,16 @@ docker compose pull
 docker compose up -d --wait --wait-timeout 180
 ```
 
-Windows PowerShell 将第一条换为 `Copy-Item .env.example .env`。仓库中也可进入 `deploy/docker/` 执行以上命令。镜像地址为 `ghcr.io/haoyu-qi/fast-folder-sync-service:0.2.2`。
+Windows PowerShell 将第一条换为 `Copy-Item .env.example .env`。仓库中也可进入 `deploy/docker/` 执行以上命令。镜像地址为 `ghcr.io/haoyu-qi/fast-folder-sync-service:0.3.0`。
 
 ### 直接下载镜像并导入
 
-镜像压缩包：[Linux amd64 镜像](https://github.com/haoyu-qi/fast-folder-sync/releases/download/v0.2.2/Folder-Sync-Server-0.2.2-Docker-Image-linux-amd64.tar.gz)。部署文件：[Docker 部署包](https://github.com/haoyu-qi/fast-folder-sync/releases/download/v0.2.2/Folder-Sync-Server-0.2.2-Docker.zip)。同发布页附镜像和部署包各自的 SHA-256 清单。
+镜像压缩包：[Linux amd64 镜像](https://github.com/haoyu-qi/fast-folder-sync/releases/download/v0.3.0/Folder-Sync-Server-0.3.0-Docker-Image-linux-amd64.tar.gz)。部署文件：[Docker 部署包](https://github.com/haoyu-qi/fast-folder-sync/releases/download/v0.3.0/Folder-Sync-Server-0.3.0-Docker.zip)。同发布页附镜像和部署包各自的 SHA-256 清单。
 
 下载后在部署目录执行：
 
 ```sh
-docker load -i Folder-Sync-Server-0.2.2-Docker-Image-linux-amd64.tar.gz
+docker load -i Folder-Sync-Server-0.3.0-Docker-Image-linux-amd64.tar.gz
 docker compose up -d --pull never --wait --wait-timeout 180
 ```
 
@@ -39,7 +39,7 @@ docker compose up -d --pull never --wait --wait-timeout 180
 | `FFS_BIND_IP` | `0.0.0.0` | 接受其他设备连接；仅本机访问时改为 `127.0.0.1` |
 | `FFS_PORT` | `9000` | 主机端口，容器内保持 9000 |
 | `TZ` | `Asia/Shanghai` | 备份计划使用的服务端时区 |
-| `FFS_VERSION` | `0.2.2` | 已发布镜像版本；离线使用时与导入镜像版本一致 |
+| `FFS_VERSION` | `0.3.0` | 已发布镜像版本；离线使用时与导入镜像版本一致 |
 
 修改端口或时区后执行 `docker compose up -d --wait --wait-timeout 180`。已配置自动重启、健康检查、30 秒停止等待和日志轮转。预构建镜像只发布并验证 linux/amd64。
 
