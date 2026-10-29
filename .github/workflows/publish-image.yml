@@ -1,0 +1,66 @@
+name: Publish downloadable Docker image
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Existing product release version
+        required: true
+        default: '0.2.2'
+permissions:
+  contents: write
+  packages: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      PRODUCT_VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate product version
+        run: |
+          [[ "$PRODUCT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          test "$PRODUCT_VERSION" = "$(cat VERSION)"
+          gh release view "v$PRODUCT_VERSION"
+      - uses: actions/checkout@v4
+        with:
+          ref: v${{ inputs.version }}
+          path: release-source
+      - name: Build the released source for Linux amd64
+        run: |
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER}/fast-folder-sync-service:$PRODUCT_VERSION"
+          echo "IMAGE=$IMAGE" >> "$GITHUB_ENV"
+          docker build --platform linux/amd64 -f release-source/fast-folder-sync-service/docker/Dockerfile.folder --label "org.opencontainers.image.source=https://github.com/$GITHUB_REPOSITORY" --label "org.opencontainers.image.version=$PRODUCT_VERSION" --label "org.opencontainers.image.revision=$(git -C release-source rev-parse HEAD)" -t "$IMAGE" release-source/fast-folder-sync-service
+      - name: Verify image startup and embedded interface
+        run: |
+          docker run -d --name image-check -p 127.0.0.1:19022:9000 "$IMAGE"
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:19022/api/health >/dev/null; then break; fi
+            sleep 2
+          done
+          curl -fsS http://127.0.0.1:19022/api/drive/capabilities | python -c 'import json,sys,os; assert json.load(sys.stdin)["data"]["version"] == os.environ["PRODUCT_VERSION"]'
+          curl -fsS http://127.0.0.1:19022/webgui/ | grep -q 'Folder Sync'
+      - name: Create image archive and deployment bundle
+        run: |
+          mkdir -p artifacts/image
+          docker save "$IMAGE" | gzip > "artifacts/image/Folder-Sync-Server-$PRODUCT_VERSION-Docker-Image-linux-amd64.tar.gz"
+          python scripts/package-docker.py artifacts/image
+          cd artifacts/image
+          sha256sum *.tar.gz > "Folder-Sync-Server-$PRODUCT_VERSION-Docker-Image-SHA256SUMS.txt"
+      - name: Upload directly downloadable image and deployment files
+        run: gh release upload "v$PRODUCT_VERSION" artifacts/image/*
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Push versioned registry image
+        run: |
+          if docker manifest inspect "$IMAGE" >/dev/null 2>&1; then
+            echo 'The versioned image already exists; refusing to overwrite it.' >&2
+            exit 1
+          fi
+          docker push "$IMAGE"
+      - name: Stop test container
+        if: always()
+        run: docker rm -f image-check || true

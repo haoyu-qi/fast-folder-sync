@@ -1,0 +1,5 @@
+services:
+  folder-sync:
+    build:
+      context: ../../fast-folder-sync-service
+      dockerfile: docker/Dockerfile.folder
