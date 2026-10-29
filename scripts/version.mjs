@@ -10,6 +10,8 @@ const packagePaths = ['fast-folder-sync/desktop', 'fast-folder-sync-service/web'
 const markers = [
   ['README.md', /当前版本：\*\*([^*]+)\*\*/g],
   ['fast-folder-sync-service/compose.folder.yaml', /image: fast-folder-sync-service:([^\s]+)/g],
+  ['deploy/docker/compose.yaml', /FFS_VERSION:-([^}]+)/g],
+  ['deploy/docker/.env.example', /FFS_VERSION=([^\s]+)/g],
   ['fast-folder-sync/desktop/index.html', /Fast Folder Sync · v([^<\s]+)/g],
   ['fast-folder-sync/desktop/mac/index.html', /<span>v([^<\s]+)<\/span>/g],
   ['fast-folder-sync/desktop/lib/fns-sync.cjs', /clientVersion: '([^']+)'/g],

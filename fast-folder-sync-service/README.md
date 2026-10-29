@@ -22,17 +22,21 @@
 
 ## 部署说明
 
-### Docker 从源码部署
+### Docker 部署包与 Compose
 
-在仓库根目录执行：
+部署包附带 Compose、环境变量示例、Dockerfile 和干净源码，解压后无需安装 Go 或 Node.js。需要 Docker Compose v2，首次构建需要联网。包内不包含离线镜像、预设账户或运行数据。
+
+在解压目录执行：
 
 ```sh
-git checkout v0.2.2
-cd fast-folder-sync-service
-docker compose -f compose.folder.yaml up -d --build
+cp .env.example .env
+docker compose config
+docker compose up -d --build --wait --wait-timeout 180
 ```
 
-需要 Docker 与 Docker Compose，首次构建需要联网。构建会生成网页资源并嵌入 Go 程序，无需在宿主机安装 Node.js 或 Go。配置卷为 `folder-sync-config`，数据卷为 `folder-sync-storage`，时区为 `Asia/Shanghai`。
+Windows PowerShell 使用 `Copy-Item .env.example .env`。源码仓库也可进入 `deploy/docker/` 执行相同命令。配置和数据保存在 Compose 文件旁的 `config/`、`storage/`，时区默认 `Asia/Shanghai`；端口、监听地址和时区可在 `.env` 调整。配置含健康检查、日志轮转与自动重启。
+
+详细参数、目录、备份、恢复和升级见 [Docker 部署说明](../deploy/docker/README.md)，完整 Compose 见 [compose.yaml](../deploy/docker/compose.yaml)。原 `compose.folder.yaml` 命名卷配方继续保留；已有用户沿用原配置，不要直接切换到新的空绑定目录。
 
 ### Windows / Linux 安装包
 

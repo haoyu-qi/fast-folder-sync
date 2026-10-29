@@ -132,8 +132,11 @@ jobs:
             fast-folder-sync/desktop/release/mac-glass/*.dmg
             fast-folder-sync/desktop/release/mac-glass/*.zip
           if-no-files-found: error
+  docker:
+    needs: verify
+    uses: ./.github/workflows/docker-deploy.yml
   publish:
-    needs: [server, windows, mac]
+    needs: [server, windows, mac, docker]
     runs-on: ubuntu-latest
     permissions:
       contents: write
