@@ -8,6 +8,7 @@ function validate(e) {
   if (e?.schema !== 1 || !HEX.test(e.entity) || !scopeOK(e.scope) || !['memory', 'project'].includes(e.type) || !Array.isArray(e.parents) || e.parents.length > 100 || !e.parents.every(p => HEX.test(p)) || typeof e.deleted !== 'boolean' || typeof e.enabled !== 'boolean' || typeof e.device !== 'string' || typeof e.time !== 'string') throw Error('无效的记忆版本');
   if (e.type === 'project' && (e.scope === 'personal' || typeof e.value?.name !== 'string' || e.value.name.length > 100)) throw Error('无效的项目');
   if (e.type === 'memory' && (!['rule', 'memory'].includes(e.value?.kind) || typeof e.value?.text !== 'string' || e.value.text.length > 1024 * 1024 || typeof e.value?.title !== 'string' || e.value.title.length > 300 || ![...AGENTS, 'manual'].includes(e.value.source?.agent))) throw Error('无效的记忆内容');
+  if (e.value.originRoots !== undefined && (!Array.isArray(e.value.originRoots) || e.value.originRoots.length > 8 || e.value.originRoots.some(s => typeof s !== 'string' || s.length > 32768))) throw Error('无效的来源路径');
   if (e.value.summary && (typeof e.value.summary.text !== 'string' || !HEX.test(e.value.summary.sourceHash) || e.value.summary.text.length > 24000)) throw Error('无效的摘要');
 }
 class AgentStore {

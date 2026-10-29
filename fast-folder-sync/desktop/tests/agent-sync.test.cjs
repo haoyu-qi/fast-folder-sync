@@ -53,7 +53,7 @@ test('two isolated computers sync projects and memories, render all tools, map p
   await b.service.bind({ id, folder: pb, agents: ['codex', 'claude', 'zcode'] }); await b.service.publish();
   const entry = b.service.store.entries().find(e => e.type === 'memory' && e.value.kind === 'memory');
   const topic = await fs.readFile(path.join(pb, '.agent-sync/topics', entry.entity + '.md'), 'utf8');
-  assert.ok(topic.includes(pb)); assert.ok(!topic.includes(pa));
+  assert.ok(topic.includes(await fs.realpath(pb))); assert.ok(!topic.includes(pa));
   for (const name of ['AGENTS.md', 'CLAUDE.md']) assert.match(await fs.readFile(path.join(pb, name), 'utf8'), /agent-sync:start/);
   assert.equal(stripManaged(await fs.readFile(path.join(pa, 'AGENTS.md'), 'utf8')).trim(), '禁止修改未关联文件');
   await a.service.cycle(); await b.service.cycle();
@@ -215,4 +215,12 @@ test('WorkBuddy selects local memory and Markdown/MDC rules, keeps cloud caches 
   assert.match(await fs.readFile(path.join(pb, 'AGENTS.md'), 'utf8'), /agent-sync:start/);
   await a.service.disconnect({ id });
   assert.equal(await fs.readFile(path.join(pa, 'CODEBUDDY.md'), 'utf8'), '原有 WorkBuddy 项目指令\n');
+});
+
+
+test('portable paths map Windows short names, slash variants and case without changing neighboring projects', () => {
+  const entry = { value: { originRoot: 'C:\\Users\\runneradmin\\project', originRoots: ['C:\\Users\\RUNNER~1\\project'] } };
+  const text = 'C:/Users/RUNNER~1/project/src, c:\\users\\runneradmin\\project\\docs 和 C:/Users/RUNNER~1/project-other';
+  const output = AgentService.prototype.portable(entry, text, { path: '/Users/me/project' });
+  assert.equal(output, '/Users/me/project/src, /Users/me/project\\docs 和 C:/Users/RUNNER~1/project-other');
 });

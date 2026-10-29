@@ -76,7 +76,7 @@ class AgentService {
       const file = instructionFile(agent);
       if (!agents.some(a => instructionFile(a) === file)) await managedRule(real, file, '', path.join(this.root, 'output-history'));
     }
-    this.config.bindings = [...this.config.bindings.filter(b => b.id !== id), { id, name: p.name, path: real, agents: [...new Set(agents)] }];
+    this.config.bindings = [...this.config.bindings.filter(b => b.id !== id), { id, name: p.name, path: real, inputPath: path.resolve(folder), agents: [...new Set(agents)] }];
     await this.save(); return this.state();
   }
   async import() {
@@ -98,7 +98,7 @@ class AgentService {
           const heads = this.store.heads(entity);
           // A derived summary does not constitute a concurrent source edit.
           const parents = previous?.revision ? heads.length && heads.every(h => h.value.text === previousEvent?.value.text && !h.deleted && h.enabled) ? heads.map(h => h.id) : [previous.revision] : [];
-          const event = await this.store.append({ entity, scope: source.scope, value: { kind: source.kind, title: doc.relative.slice(0, 300), text: doc.text, originRoot: binding?.path || '', source: { agent: source.agent, label: source.label, relative: doc.relative } }, parents });
+          const event = await this.store.append({ entity, scope: source.scope, value: { kind: source.kind, title: doc.relative.slice(0, 300), text: doc.text, originRoot: binding?.path || '', originRoots: [...new Set([binding?.path, binding?.inputPath].filter(Boolean))], source: { agent: source.agent, label: source.label, relative: doc.relative } }, parents });
           this.config.seen[key] = { hash: doc.hash, entity, revision: event.id };
         }
       } catch (e) { this.issues.push(source.label + '：' + e.message); }
@@ -179,7 +179,12 @@ class AgentService {
     await this.publish(); await this.save(); return this.state();
   }
   portable(entry, text, binding) {
-    return entry.value.originRoot ? text.split(entry.value.originRoot).join(binding.path) : text;
+    const roots = [...new Set([entry.value.originRoot, ...(entry.value.originRoots || [])].filter(s => typeof s === 'string' && s))];
+    if (!roots.length) return text;
+    const windows = roots.some(s => /^[A-Za-z]:[\\/]/.test(s));
+    const aliases = [...new Set(roots.flatMap(s => windows ? [s, s.replaceAll('\\', '/')] : [s]))].sort((a, b) => b.length - a.length);
+    const pattern = aliases.map(s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+    return text.replace(new RegExp('(?:' + pattern + ')(?=$|[\\\\/\\s\\x60"\'，。；;,.)\\]])', windows ? 'gi' : 'g'), () => binding.path);
   }
   async publish() {
     if (this.store.errors?.length) throw Error('共享库存在损坏版本，暂停提供记忆；请检查来源与同步记录');
