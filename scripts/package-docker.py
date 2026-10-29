@@ -16,7 +16,8 @@ target = output / f"Folder-Sync-Server-{version}-Docker.zip"
 with zipfile.ZipFile(target, "w", zipfile.ZIP_DEFLATED) as archive:
     for filename in filter(None, files):
         relative = filename.removeprefix("fast-folder-sync-service/")
-        if any(part in {"node_modules", "storage", "build", ".git", "artifacts"} for part in Path(relative).parts):
+        parts = Path(relative).parts
+        if parts[0] in {"storage", "build", "artifacts"} or any(part in {"node_modules", ".git"} for part in parts):
             continue
         if Path(relative).name in {".env", ".env.local"}:
             continue
