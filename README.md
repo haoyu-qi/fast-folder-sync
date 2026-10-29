@@ -82,32 +82,46 @@ Windows 包未进行代码签名。Mac 包使用本地 ad-hoc 签名，没有 De
 
 ### 2. 部署私有服务端
 
-可选择 Docker 从源码部署，或使用对应系统的服务端安装包。默认端口为 **9000**，网页入口为 **`/webgui/`**。
+可选择 Docker 部署包、仓库 Compose 或对应系统的原生安装包。默认端口为 **9000**，网页入口为 **`/webgui/`**。
 
-**方式 A：Docker 从源码部署**
+**方式 A：Docker 部署包 / Compose**
 
-需要 Git、Docker 和 Docker Compose。首次构建需要联网下载依赖。
+部署包 `Folder-Sync-Server-0.2.2-Docker.zip` 包含 Compose、环境变量示例、干净源码和源码提交记录，另附 Docker 包专用 SHA-256 清单。它从源码构建镜像，首次部署需要联网；宿主机只需 Docker 与 Docker Compose v2。
+
+解压后在包目录执行：
+
+```sh
+cp .env.example .env
+docker compose config
+docker compose up -d --build --wait --wait-timeout 180
+```
+
+Windows PowerShell 使用 `Copy-Item .env.example .env`。也可直接使用仓库配置：
 
 ```sh
 git clone https://github.com/haoyu-qi/fast-folder-sync.git
 cd fast-folder-sync
-git checkout v0.2.2
-cd fast-folder-sync-service
-docker compose -f compose.folder.yaml up -d --build
+cd deploy/docker
+cp .env.example .env
+docker compose up -d --build --wait --wait-timeout 180
 ```
 
 在服务所在电脑打开 `http://127.0.0.1:9000/webgui/`；其他电脑访问 `http://服务端IP:9000/webgui/`。Compose 使用 `Asia/Shanghai` 时区，计划备份按服务端时区执行。
 
 | 持久化位置 | 内容 |
 | --- | --- |
-| 配置卷 `folder-sync-config`，容器内 `/app/config` | 服务配置与认证密钥 |
-| 数据卷 `folder-sync-storage`，容器内 `/app/storage` | 数据库、上传文件与本地存储数据 |
+| 包目录下 `config/` → `/app/config` | 服务配置与认证密钥 |
+| 包目录下 `storage/` → `/app/storage` | 数据库、上传文件与本地存储数据 |
+
+`.env` 支持 `FFS_PORT`（主机端口）、`FFS_BIND_IP`（监听地址）、`TZ`（时区）和 `FFS_VERSION`（本地镜像标签）。默认接受其他设备连接；仅本机使用时将 `FFS_BIND_IP` 改为 `127.0.0.1`。Compose 配置了自动重启、健康检查、停止等待和日志轮转。完整配置、备份恢复和升级步骤见 [Docker 部署说明](deploy/docker/README.md)，配置文件见 [compose.yaml](deploy/docker/compose.yaml)。
+
+原 `fast-folder-sync-service/compose.folder.yaml` 继续保留，使用命名卷 `folder-sync-config` 与 `folder-sync-storage`。已有命名卷部署应继续使用原配置；新包的绑定目录不会自动迁移原卷中的数据。
 
 查看状态和日志：
 
 ```sh
-docker compose -f compose.folder.yaml ps
-docker compose -f compose.folder.yaml logs --tail=100 -f
+docker compose ps
+docker compose logs --tail=100 -f
 ```
 
 **方式 B：Windows / Linux 安装包**
@@ -144,7 +158,7 @@ chmod +x fast-folder-sync-service start.sh
 
 在「存储位置」添加并验证备份目标，再到「备份任务」选择文件库、备份类型、计划和保留周期。镜像同步会使目标跟随源内容；需要保留备份归档时使用全量或增量归档。
 
-升级前停止服务并备份配置、数据库及文件存储。Docker 部署更新源码到目标标签后，重新执行 `docker compose -f compose.folder.yaml up -d --build`，保留原数据卷；不要使用 `down -v`。原生部署替换程序和启动脚本，保留原 `config/` 与 `storage/`。客户端升级为替换可执行文件或应用，保留应用数据目录中的任务和历史版本。
+升级前停止服务并备份配置、数据库及文件存储。Docker 部署包在原目录替换源码及部署文件、保留原数据和 `.env`，再执行 `docker compose up -d --build --wait --wait-timeout 180`；原命名卷部署继续使用原 Compose 文件、保留原卷，不使用 `down -v`。原生部署替换程序和启动脚本，保留原 `config/` 与 `storage/`。客户端升级为替换可执行文件或应用，保留应用数据目录中的任务和历史版本。
 
 版本记录见 [CHANGELOG](CHANGELOG.md)。开发与构建见[桌面开发说明](fast-folder-sync/docs/desktop.md)、[服务端开发说明](docs/SERVER-DEVELOPMENT.md)和[版本管理说明](docs/VERSIONING.md)。
 

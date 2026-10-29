@@ -1,0 +1,28 @@
+name: fast-folder-sync
+services:
+  folder-sync:
+    build:
+      context: ../../fast-folder-sync-service
+      dockerfile: docker/Dockerfile.folder
+    image: fast-folder-sync-service:${FFS_VERSION:-0.2.2}
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+    ports:
+      - "${FFS_BIND_IP:-0.0.0.0}:${FFS_PORT:-9000}:9000"
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+    volumes:
+      - ./config:/app/config
+      - ./storage:/app/storage
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
